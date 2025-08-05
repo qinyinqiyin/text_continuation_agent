@@ -6,7 +6,7 @@ from transformers import BertTokenizer, BertModel
 class PyTorchEmbeddingModel:
     def __init__(self, model_name: str = "bert-base-chinese", local_dir: str = "E:\\text_continuation_agent"):
         self.local_model_path = os.path.join(local_dir, model_name)
-        self._validate_model()  # 现在这个方法已经被定义
+        self._validate_model()  
 
         # 从本地加载 Tokenizer 和 Model
         self.tokenizer = BertTokenizer.from_pretrained(self.local_model_path)
@@ -57,3 +57,4 @@ class PyTorchEmbeddingModel:
             assert embeddings.shape[1] == self.dimension, \
                 f"编码维度异常: 预期 {self.dimension}, 实际 {embeddings.shape[1]}"
             return embeddings
+
