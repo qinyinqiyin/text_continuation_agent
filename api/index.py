@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 导入Flask应用
 from app import app
 
-# Vercel Python运行时需要这个
+# Vercel Python运行时需要导出app对象
 # 它会自动处理Flask应用的WSGI接口
+handler = app
 
