@@ -11,9 +11,23 @@ class PyTorchEmbeddingModel:
         self.local_model_path = os.path.join(local_dir, model_name)
         self._validate_model()
 
-        # 从本地加载 Tokenizer 和 Model
-        self.tokenizer = BertTokenizer.from_pretrained(self.local_model_path)
-        self.model = BertModel.from_pretrained(self.local_model_path)
+        # 从本地加载 Tokenizer 和 Model（如果本地不存在会自动从Hugging Face下载）
+        # 优先使用本地路径，如果失败则从Hugging Face下载
+        try:
+            self.tokenizer = BertTokenizer.from_pretrained(self.local_model_path)
+            self.model = BertModel.from_pretrained(self.local_model_path)
+        except Exception as e:
+            # 如果本地加载失败，尝试直接从Hugging Face加载
+            print(f"本地模型加载失败: {str(e)}，尝试从Hugging Face直接加载...")
+            self.tokenizer = BertTokenizer.from_pretrained("bert-base-chinese")
+            self.model = BertModel.from_pretrained("bert-base-chinese")
+            # 保存到本地以便下次使用
+            try:
+                self.tokenizer.save_pretrained(self.local_model_path)
+                self.model.save_pretrained(self.local_model_path)
+                print("✅ 已保存模型到本地目录")
+            except Exception as save_error:
+                print(f"⚠️ 保存模型到本地失败（不影响使用）: {str(save_error)}")
 
         # 设置模型为评估模式
         self.model.eval()
