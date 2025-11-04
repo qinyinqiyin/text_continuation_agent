@@ -4,21 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文本续写助手</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <!-- 头部 -->
         <header>
-            <h1>📝 文本续写助手</h1>
-            <p class="subtitle">支持文章大纲阶段判断与续写 | MCP工具增强</p>
+            <div class="header-decoration"></div>
+            <h1>文本续写助手</h1>
+            <p class="subtitle">支持文章大纲阶段判断与续写 · MCP工具增强</p>
         </header>
 
         <!-- 标签页导航 -->
         <div class="tabs">
-            <button class="tab-btn active" data-tab="continuation">📝 文本续写</button>
-            <button class="tab-btn" data-tab="settings">⚙️ 设定管理</button>
-            <button class="tab-btn" data-tab="mcp-tools">🔧 MCP工具</button>
+            <button class="tab-btn active" data-tab="continuation">文本续写</button>
+            <button class="tab-btn" data-tab="settings">设定管理</button>
+            <button class="tab-btn" data-tab="mcp-tools">MCP工具</button>
         </div>
 
         <!-- 文本续写标签页 -->
@@ -72,14 +76,14 @@
                     <input type="text" id="requirements" placeholder="例如：增加冲突，埋下伏笔...">
                 </div>
 
-                <button class="btn btn-primary" onclick="startContinuation()">🚀 开始续写</button>
+                <button class="btn btn-primary" onclick="startContinuation()">开始续写</button>
 
                 <div id="continuation-result" class="result-area" style="display: none;">
                     <h3>续写结果</h3>
                     <div id="result-content" class="result-content"></div>
                     <div class="btn-group">
                         <button class="btn btn-secondary" onclick="mergeResult()">合并到前文继续续写</button>
-                        <button class="btn btn-secondary" onclick="downloadText()">💾 下载完整文本</button>
+                        <button class="btn btn-secondary" onclick="downloadText()">下载完整文本</button>
                     </div>
                 </div>
 
@@ -100,13 +104,13 @@
                     <div class="stat-item">
                         <span id="kb-total-count">0</span> 条设定
                     </div>
-                    <button class="btn btn-danger" onclick="clearAllSettings()">🗑️ 一键清空知识库</button>
+                    <button class="btn btn-danger" onclick="clearAllSettings()">一键清空知识库</button>
                 </div>
 
                 <hr>
 
                 <!-- 文件上传 -->
-                <h3>📄 上传已有文章（TXT文件）</h3>
+                <h3>上传已有文章（TXT文件）</h3>
                 <div class="form-group">
                     <input type="file" id="file-upload" accept=".txt" onchange="handleFileSelect(event)">
                     <div id="file-info" class="file-info" style="display: none;"></div>
@@ -120,13 +124,13 @@
                             <input type="number" id="overlap-size" value="200" min="0" max="500" step="50">
                         </div>
                     </div>
-                    <button class="btn btn-primary" id="upload-btn" onclick="uploadArticle()" disabled>✅ 添加文章到知识库</button>
+                    <button class="btn btn-primary" id="upload-btn" onclick="uploadArticle()" disabled>添加文章到知识库</button>
                 </div>
 
                 <hr>
 
                 <!-- 添加新设定 -->
-                <h3>✍️ 手动添加新设定</h3>
+                <h3>手动添加新设定</h3>
                 <div class="form-row">
                     <div class="form-group">
                         <label>设定类型</label>
@@ -159,18 +163,18 @@
         <!-- MCP工具标签页 -->
         <div id="mcp-tools" class="tab-content">
             <div class="card">
-                <h2>🔧 MCP工具中心</h2>
+                <h2>MCP工具中心</h2>
                 <p class="subtitle">使用标准化的MCP工具增强文本续写功能</p>
 
                 <!-- 工具子标签 -->
                 <div class="sub-tabs">
-                    <button class="sub-tab-btn active" data-subtab="filesystem">📁 文件系统工具</button>
-                    <button class="sub-tab-btn" data-subtab="text-analysis">📊 文本分析工具</button>
+                    <button class="sub-tab-btn active" data-subtab="filesystem">文件系统工具</button>
+                    <button class="sub-tab-btn" data-subtab="text-analysis">文本分析工具</button>
                 </div>
 
                 <!-- 文件系统工具 -->
                 <div id="filesystem" class="sub-tab-content active">
-                    <h3>📁 文件系统操作</h3>
+                    <h3>文件系统操作</h3>
                     <div class="form-group">
                         <label>选择操作</label>
                         <select id="fs-action" onchange="handleFsActionChange()">
@@ -186,7 +190,7 @@
 
                 <!-- 文本分析工具 -->
                 <div id="text-analysis" class="sub-tab-content">
-                    <h3>📊 文本分析</h3>
+                    <h3>文本分析</h3>
                     <div class="form-group">
                         <label>分析类型</label>
                         <select id="analysis-action">
@@ -219,7 +223,7 @@
                         </select>
                     </div>
 
-                    <button class="btn btn-primary" onclick="analyzeText()">🔍 开始分析</button>
+                    <button class="btn btn-primary" onclick="analyzeText()">开始分析</button>
 
                     <div id="analysis-result" class="result-area" style="display: none;">
                         <h3>分析结果</h3>
