@@ -297,7 +297,6 @@ def upload_article():
         # 处理文件内容（改进的分段逻辑）
         segments = []
         
-        # 如果文件内容小于chunk_size，也尝试分段（避免单一大段落）
         # 首先尝试按双换行分段
         paragraphs = [p.strip() for p in file_content.split('\n\n') if p.strip()]
         
@@ -310,44 +309,54 @@ def upload_article():
             sentences = re.split(r'[。！？\n]', file_content)
             paragraphs = [s.strip() for s in sentences if s.strip() and len(s.strip()) > 10]
         
-        # 分段处理
+        # 如果仍然没有段落，尝试按逗号或其他标点分段
+        if not paragraphs:
+            paragraphs = re.split(r'[，；\n]', file_content)
+            paragraphs = [p.strip() for p in paragraphs if p.strip() and len(p.strip()) > 20]
+        
+        # 分段处理：强制分段，即使文件很小也要分段
         current_chunk = ""
-        for para in paragraphs:
+        for i, para in enumerate(paragraphs):
             para_text = para.strip()
             if not para_text:
                 continue
             
-            # 如果当前段落加上新段落超过chunk_size，保存当前块
-            if current_chunk and len(current_chunk) + len(para_text) + 2 > chunk_size:
+            # 如果单个段落就超过chunk_size，需要进一步切分
+            if len(para_text) > chunk_size:
+                # 先保存当前块
                 if current_chunk.strip():
                     segments.append(current_chunk.strip())
-                current_chunk = para_text
+                    current_chunk = ""
+                
+                # 切分超长段落
+                sentences = re.split(r'[。！？]', para_text)
+                temp_chunk = ""
+                for sent in sentences:
+                    sent = sent.strip()
+                    if not sent:
+                        continue
+                    if len(temp_chunk) + len(sent) + 1 > chunk_size:
+                        if temp_chunk.strip():
+                            segments.append(temp_chunk.strip())
+                        temp_chunk = sent
+                    else:
+                        temp_chunk += sent + "。"
+                if temp_chunk.strip():
+                    current_chunk = temp_chunk.strip()
             else:
-                # 如果单个段落就超过chunk_size，需要进一步切分
-                if len(para_text) > chunk_size:
-                    # 先保存当前块
-                    if current_chunk.strip():
-                        segments.append(current_chunk.strip())
-                        current_chunk = ""
-                    
-                    # 切分超长段落
-                    # 尝试按句号切分
-                    sentences = re.split(r'[。！？]', para_text)
-                    temp_chunk = ""
-                    for sent in sentences:
-                        sent = sent.strip()
-                        if not sent:
-                            continue
-                        if len(temp_chunk) + len(sent) + 1 > chunk_size:
-                            if temp_chunk.strip():
-                                segments.append(temp_chunk.strip())
-                            temp_chunk = sent
-                        else:
-                            temp_chunk += sent + "。"
-                    if temp_chunk.strip():
-                        current_chunk = temp_chunk.strip()
+                # 检查是否应该开始新段落
+                # 策略：如果当前块加上新段落超过chunk_size，或者当前块已经有足够的段落数，就分段
+                would_exceed = current_chunk and len(current_chunk) + len(para_text) + 2 > chunk_size
+                
+                # 强制分段：每3-5个段落或达到chunk_size就分段
+                para_count_in_chunk = current_chunk.count('\n\n') + 1 if current_chunk else 0
+                should_split = would_exceed or (para_count_in_chunk >= 3 and len(current_chunk) > chunk_size * 0.7)
+                
+                if should_split and current_chunk.strip():
+                    segments.append(current_chunk.strip())
+                    current_chunk = para_text
                 else:
-                    # 正常添加到当前块
+                    # 添加到当前块
                     if current_chunk:
                         current_chunk += "\n\n" + para_text
                     else:
@@ -356,6 +365,27 @@ def upload_article():
         # 保存最后一个块
         if current_chunk.strip():
             segments.append(current_chunk.strip())
+        
+        # 如果仍然只有一个段落，强制按chunk_size切分
+        if len(segments) == 1 and len(segments[0]) > chunk_size:
+            logger.info(f"文件较长但只有1个段落，强制按chunk_size={chunk_size}切分")
+            single_seg = segments[0]
+            segments = []
+            # 按句号切分
+            sentences = re.split(r'[。！？]', single_seg)
+            temp_chunk = ""
+            for sent in sentences:
+                sent = sent.strip()
+                if not sent:
+                    continue
+                if len(temp_chunk) + len(sent) + 1 > chunk_size:
+                    if temp_chunk.strip():
+                        segments.append(temp_chunk.strip())
+                    temp_chunk = sent
+                else:
+                    temp_chunk += sent + "。"
+            if temp_chunk.strip():
+                segments.append(temp_chunk.strip())
         
         # 如果没有分到任何段落，使用整个文件内容
         if not segments:
