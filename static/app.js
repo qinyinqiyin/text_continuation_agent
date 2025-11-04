@@ -10,6 +10,120 @@ const API_BASE = window.location.hostname === 'localhost'
     ? 'http://localhost:5000/api' 
     : '/api';
 
+// ==================== API密钥加密存储 ====================
+
+// 简单的加密函数（使用XOR加密 + Base64编码）
+function encryptApiKey(key) {
+    if (!key) return '';
+    // 使用一个简单的密钥（实际应用中可以使用更复杂的方法）
+    const secret = 'TextContinuationAgent2024';
+    let encrypted = '';
+    for (let i = 0; i < key.length; i++) {
+        encrypted += String.fromCharCode(key.charCodeAt(i) ^ secret.charCodeAt(i % secret.length));
+    }
+    return btoa(encrypted); // Base64编码
+}
+
+// 解密函数
+function decryptApiKey(encrypted) {
+    if (!encrypted) return '';
+    try {
+        const encoded = atob(encrypted); // Base64解码
+        const secret = 'TextContinuationAgent2024';
+        let decrypted = '';
+        for (let i = 0; i < encoded.length; i++) {
+            decrypted += String.fromCharCode(encoded.charCodeAt(i) ^ secret.charCodeAt(i % secret.length));
+        }
+        return decrypted;
+    } catch (e) {
+        console.error('解密失败:', e);
+        return '';
+    }
+}
+
+// 保存API密钥到localStorage
+function saveApiKey(key) {
+    if (!key || !key.trim()) return;
+    try {
+        const encrypted = encryptApiKey(key);
+        localStorage.setItem('api_key_encrypted', encrypted);
+        localStorage.setItem('remember_key', 'true');
+        console.log('API密钥已加密保存');
+    } catch (e) {
+        console.error('保存密钥失败:', e);
+    }
+}
+
+// 从localStorage读取API密钥
+function loadApiKey() {
+    try {
+        const encrypted = localStorage.getItem('api_key_encrypted');
+        const remember = localStorage.getItem('remember_key') === 'true';
+        if (encrypted && remember) {
+            const decrypted = decryptApiKey(encrypted);
+            if (decrypted) {
+                document.getElementById('api-key').value = decrypted;
+                document.getElementById('remember-key').checked = true;
+                return decrypted;
+            }
+        }
+    } catch (e) {
+        console.error('读取密钥失败:', e);
+    }
+    return '';
+}
+
+// 清除保存的API密钥
+function clearSavedKey() {
+    if (confirm('确定要清除已保存的API密钥吗？')) {
+        localStorage.removeItem('api_key_encrypted');
+        localStorage.removeItem('remember_key');
+        document.getElementById('api-key').value = '';
+        document.getElementById('remember-key').checked = false;
+        alert('已清除保存的API密钥');
+    }
+}
+
+// 页面加载时自动填充密钥
+function initApiKeyStorage() {
+    // 确保元素已加载
+    const apiKeyInput = document.getElementById('api-key');
+    const rememberCheckbox = document.getElementById('remember-key');
+    
+    if (!apiKeyInput || !rememberCheckbox) {
+        // 如果元素还没加载，延迟执行
+        setTimeout(initApiKeyStorage, 100);
+        return;
+    }
+    
+    // 加载保存的密钥
+    loadApiKey();
+    
+    // 监听API密钥输入框的变化，如果勾选了记住，则自动保存
+    apiKeyInput.addEventListener('blur', function() {
+        if (rememberCheckbox.checked && apiKeyInput.value.trim()) {
+            saveApiKey(apiKeyInput.value);
+        }
+    });
+    
+    rememberCheckbox.addEventListener('change', function() {
+        if (this.checked && apiKeyInput.value.trim()) {
+            saveApiKey(apiKeyInput.value);
+        } else if (!this.checked) {
+            localStorage.removeItem('api_key_encrypted');
+            localStorage.removeItem('remember_key');
+        }
+    });
+}
+
+// 页面加载完成后初始化
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApiKeyStorage);
+} else {
+    // DOM已经加载完成
+    initApiKeyStorage();
+}
+
 // 统一的响应处理函数
 async function handleResponse(response) {
     // 先读取响应文本
@@ -93,10 +207,16 @@ async function startContinuation() {
     const maxLength = parseInt(document.getElementById('max-length').value);
     const temperature = parseFloat(document.getElementById('temperature').value);
     const useRag = document.getElementById('use-rag').checked;
+    const rememberKey = document.getElementById('remember-key').checked;
     
     if (!apiKey || !context.trim()) {
         alert('请完善API密钥和前文内容');
         return;
+    }
+    
+    // 如果勾选了记住密钥，则保存
+    if (rememberKey && apiKey.trim()) {
+        saveApiKey(apiKey);
     }
     
     currentApiKey = apiKey;

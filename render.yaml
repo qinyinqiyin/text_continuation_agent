@@ -5,7 +5,7 @@ services:
     region: singapore  # 可选择：singapore, oregon, frankfurt, etc.
     plan: free  # 免费计划
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile -
     envVars:
       - key: FLASK_ENV
         value: production
@@ -17,7 +17,7 @@ services:
       #   value: your-dashscope-api-key-here
       # - key: EMBEDDING_API_TYPE
       #   value: dashscope
-    healthCheckPath: /api/health
+    healthCheckPath: /health
     # 可选：如果需要更大的内存，可以升级到starter计划
     # plan: starter  # 512MB RAM, $7/月
 

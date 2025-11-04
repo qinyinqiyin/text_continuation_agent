@@ -549,9 +549,14 @@ def analyze_text():
 # ==================== 健康检查 ====================
 
 @app.route('/api/health', methods=['GET'])
+@app.route('/health', methods=['GET'])
 def health():
-    """健康检查接口"""
-    return jsonify({"status": "ok", "message": "服务运行正常"})
+    """健康检查接口 - 快速响应，不触发任何模型加载"""
+    # 直接返回，不调用任何可能触发延迟加载的函数
+    return jsonify({
+        "status": "ok", 
+        "message": "服务运行正常"
+    }), 200
 
 
 if __name__ == '__main__':

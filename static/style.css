@@ -557,3 +557,20 @@ input[type="file"]:hover {
     border-color: #8b7d5e;
     background: #f9f7f2;
 }
+
+/* API密钥存储相关样式 */
+.form-group label input[type="checkbox"] {
+    vertical-align: middle;
+}
+
+.form-group button[onclick="clearSavedKey()"] {
+    background: #9a8f7e;
+    color: #fefcf8;
+    font-size: 0.9em;
+    padding: 8px 16px;
+    margin-top: 8px;
+}
+
+.form-group button[onclick="clearSavedKey()"]:hover {
+    background: #8a7f6e;
+}
