@@ -23,38 +23,47 @@ class PyTorchEmbeddingModel:
         print(f"模型固定维度: {self.dimension}")
 
     def _validate_model(self):
-        """验证模型目录和关键文件是否存在"""
+        """验证模型目录和关键文件是否存在，如果不存在则自动下载"""
         # 检查模型目录是否存在
         if not os.path.exists(self.local_model_path):
-            raise FileNotFoundError(f"模型目录不存在: {self.local_model_path}")
+            os.makedirs(self.local_model_path, exist_ok=True)
+            print(f"创建模型目录: {self.local_model_path}")
 
         # 检查关键文件是否存在
         required_files = ["vocab.txt", "config.json", "pytorch_model.bin"]
         missing_files = [f for f in required_files if not os.path.exists(os.path.join(self.local_model_path, f))]
         
-        # 如果缺少 config.json，尝试从 transformers 库获取
-        if "config.json" in missing_files:
+        # 如果缺少关键文件，尝试从Hugging Face下载
+        if missing_files:
+            print(f"检测到缺失文件: {missing_files}")
+            print("正在从Hugging Face下载模型文件...")
             try:
-                from transformers import BertConfig
-                print(f"检测到缺少 config.json，正在从 transformers 库获取默认配置...")
+                from transformers import BertTokenizer, BertModel, BertConfig
+                
+                # 下载并保存模型
+                print("下载tokenizer...")
+                tokenizer = BertTokenizer.from_pretrained("bert-base-chinese")
+                tokenizer.save_pretrained(self.local_model_path)
+                
+                print("下载模型配置...")
                 config = BertConfig.from_pretrained("bert-base-chinese")
-                
-                # 验证并调整词汇表大小以匹配本地的 vocab.txt
-                vocab_file = os.path.join(self.local_model_path, "vocab.txt")
-                if os.path.exists(vocab_file):
-                    with open(vocab_file, 'r', encoding='utf-8') as f:
-                        actual_vocab_size = len(f.readlines())
-                    if config.vocab_size != actual_vocab_size:
-                        print(f"调整词汇表大小: {config.vocab_size} -> {actual_vocab_size}")
-                        config.vocab_size = actual_vocab_size
-                
                 config.save_pretrained(self.local_model_path)
-                config_path = os.path.join(self.local_model_path, "config.json")
-                print(f"已保存 config.json 到 {config_path}")
-                missing_files.remove("config.json")
+                
+                print("下载模型权重（这可能需要几分钟，约400MB）...")
+                model = BertModel.from_pretrained("bert-base-chinese")
+                model.save_pretrained(self.local_model_path)
+                
+                print("✅ 模型下载完成！")
+                
+                # 重新检查
+                missing_files = [f for f in required_files if not os.path.exists(os.path.join(self.local_model_path, f))]
+                
             except Exception as e:
-                print(f"无法自动获取 config.json: {str(e)}")
+                print(f"⚠️ 自动下载失败: {str(e)}")
+                print("提示：如果网络问题，可以手动下载模型文件")
+                raise FileNotFoundError(f"无法获取模型文件: {str(e)}")
         
+        # 如果还有缺失文件，抛出错误
         if missing_files:
             raise FileNotFoundError(f"缺失关键文件: {missing_files}，请确认模型文件完整性")
 
