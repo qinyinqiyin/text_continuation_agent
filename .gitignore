@@ -35,8 +35,9 @@ logs/
 .DS_Store
 Thumbs.db
 
-# 模型文件（如果太大）
-# bert-base-chinese/
+# 模型文件（太大，超过GitHub 100MB限制）
+bert-base-chinese/pytorch_model.bin
+# 其他大文件可以手动下载
 
 # 备份文件
 backup_*.pkl
