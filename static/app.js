@@ -10,6 +10,26 @@ const API_BASE = window.location.hostname === 'localhost'
     ? 'http://localhost:5000/api' 
     : '/api';
 
+// 统一的响应处理函数
+async function handleResponse(response) {
+    // 先读取响应文本
+    const text = await response.text();
+    
+    // 如果响应为空
+    if (!text || text.trim() === '') {
+        throw new Error(`服务器返回空响应 (状态码: ${response.status})`);
+    }
+    
+    // 尝试解析JSON
+    try {
+        const data = JSON.parse(text);
+        return data;
+    } catch (e) {
+        // 如果不是JSON，返回原始文本作为错误信息
+        throw new Error(`服务器响应格式错误: ${text.substring(0, 200)}`);
+    }
+}
+
 // ==================== 标签页切换 ====================
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -103,16 +123,23 @@ async function startContinuation() {
             })
         });
         
-        const data = await response.json();
+        // 检查响应状态
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '未知错误');
+            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             currentResult = data.result;
             document.getElementById('result-content').textContent = data.result;
             document.getElementById('continuation-result').style.display = 'block';
         } else {
-            alert('续写失败：' + data.error);
+            alert('续写失败：' + (data.error || '未知错误'));
         }
     } catch (error) {
+        console.error('续写请求错误:', error);
         alert('请求失败：' + error.message);
     } finally {
         document.getElementById('loading').style.display = 'none';
@@ -154,11 +181,18 @@ function downloadText() {
 async function loadSettings() {
     try {
         const response = await fetch(`${API_BASE}/knowledge-base/settings`);
-        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(`加载失败 (${response.status})`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             displaySettings(data.settings);
             updateKBStats(data.settings);
+        } else {
+            console.error('加载设定失败：', data.error);
         }
     } catch (error) {
         console.error('加载设定失败：', error);
@@ -168,7 +202,12 @@ async function loadSettings() {
 async function loadKBStats() {
     try {
         const response = await fetch(`${API_BASE}/knowledge-base/stats`);
-        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(`加载失败 (${response.status})`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             document.getElementById('kb-total-count').textContent = data.total_count;
@@ -242,7 +281,12 @@ async function addSetting() {
             })
         });
         
-        const data = await response.json();
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '未知错误');
+            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             alert('添加成功！');
@@ -250,9 +294,10 @@ async function addSetting() {
             loadSettings();
             loadKBStats();
         } else {
-            alert('添加失败：' + data.error);
+            alert('添加失败：' + (data.error || '未知错误'));
         }
     } catch (error) {
+        console.error('添加设定错误:', error);
         alert('请求失败：' + error.message);
     }
 }
@@ -267,16 +312,22 @@ async function deleteSetting(id) {
             method: 'DELETE'
         });
         
-        const data = await response.json();
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '未知错误');
+            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             alert('删除成功！');
             loadSettings();
             loadKBStats();
         } else {
-            alert('删除失败：' + data.error);
+            alert('删除失败：' + (data.error || '未知错误'));
         }
     } catch (error) {
+        console.error('删除设定错误:', error);
         alert('请求失败：' + error.message);
     }
 }
@@ -291,16 +342,22 @@ async function clearAllSettings() {
             method: 'POST'
         });
         
-        const data = await response.json();
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '未知错误');
+            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             alert('清空成功！');
             loadSettings();
             loadKBStats();
         } else {
-            alert('清空失败：' + data.error);
+            alert('清空失败：' + (data.error || '未知错误'));
         }
     } catch (error) {
+        console.error('清空知识库错误:', error);
         alert('请求失败：' + error.message);
     }
 }
@@ -343,7 +400,12 @@ async function uploadArticle() {
             body: formData
         });
         
-        const data = await response.json();
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '未知错误');
+            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             alert(`上传成功！共分割为 ${data.segments_count} 个段落`);
@@ -439,14 +501,20 @@ async function importDirectory() {
             })
         });
         
-        const data = await response.json();
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '未知错误');
+            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             alert(`成功导入 ${data.result.imported_count} 个文件`);
         } else {
-            alert('导入失败：' + data.error);
+            alert('导入失败：' + (data.error || '未知错误'));
         }
     } catch (error) {
+        console.error('导入目录错误:', error);
         alert('请求失败：' + error.message);
     }
 }
@@ -466,15 +534,21 @@ async function backupKB() {
             })
         });
         
-        const data = await response.json();
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '未知错误');
+            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             alert('备份成功！');
             console.log(data.result);
         } else {
-            alert('备份失败：' + data.error);
+            alert('备份失败：' + (data.error || '未知错误'));
         }
     } catch (error) {
+        console.error('备份错误:', error);
         alert('请求失败：' + error.message);
     }
 }
@@ -503,15 +577,21 @@ async function restoreKB() {
             })
         });
         
-        const data = await response.json();
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '未知错误');
+            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             alert('恢复成功！请刷新页面');
             location.reload();
         } else {
-            alert('恢复失败：' + data.error);
+            alert('恢复失败：' + (data.error || '未知错误'));
         }
     } catch (error) {
+        console.error('恢复错误:', error);
         alert('请求失败：' + error.message);
     }
 }
@@ -531,7 +611,12 @@ async function listFiles() {
             })
         });
         
-        const data = await response.json();
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '未知错误');
+            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             const result = data.result;
@@ -543,9 +628,10 @@ async function listFiles() {
             html += '</ul>';
             container.innerHTML = html;
         } else {
-            alert('列出文件失败：' + data.error);
+            alert('列出文件失败：' + (data.error || '未知错误'));
         }
     } catch (error) {
+        console.error('列出文件错误:', error);
         alert('请求失败：' + error.message);
     }
 }
@@ -596,14 +682,20 @@ async function analyzeText() {
             body: JSON.stringify(params)
         });
         
-        const data = await response.json();
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '未知错误');
+            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+        
+        const data = await handleResponse(response);
         
         if (data.success) {
             displayAnalysisResult(data.result);
         } else {
-            alert('分析失败：' + data.error);
+            alert('分析失败：' + (data.error || '未知错误'));
         }
     } catch (error) {
+        console.error('文本分析错误:', error);
         alert('请求失败：' + error.message);
     }
 }

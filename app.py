@@ -20,6 +20,21 @@ from mcp_tools import create_mcp_registry
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)  # 允许跨域请求
 
+# 全局错误处理器，确保所有错误都返回JSON格式
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"success": False, "error": "接口不存在"}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({"success": False, "error": "服务器内部错误"}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """捕获所有未处理的异常"""
+    logger.error(f"未处理的异常: {str(e)}", exc_info=True)
+    return jsonify({"success": False, "error": f"服务器错误: {str(e)}"}), 500
+
 # 全局状态管理（在实际生产环境中应使用Redis或数据库）
 # 延迟加载knowledge_base以避免启动时加载大型模型导致OOM
 _knowledge_base = None
@@ -136,7 +151,13 @@ def index():
 def continuation():
     """文本续写接口"""
     try:
+        # 检查请求是否为JSON
+        if not request.is_json:
+            return jsonify({"success": False, "error": "请求必须是JSON格式"}), 400
+        
         data = request.json
+        if data is None:
+            return jsonify({"success": False, "error": "请求体为空"}), 400
         api_key = data.get('api_key')
         style = data.get('style', 'fantasy')
         context = data.get('context', '')
