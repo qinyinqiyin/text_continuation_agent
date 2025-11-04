@@ -11,6 +11,7 @@ services:
         value: production
       - key: PYTHONUTF8
         value: "1"
+      # 向量检索配置：优先使用本地模型，如果没有则使用API
       # 如果使用DashScope API嵌入服务，取消注释下面这行并设置你的API密钥
       # - key: DASHSCOPE_API_KEY
       #   value: your-dashscope-api-key-here
