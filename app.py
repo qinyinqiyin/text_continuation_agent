@@ -381,46 +381,73 @@ def upload_article():
         # 如果仍然只有一个段落，强制按chunk_size切分
         if len(segments) == 1:
             single_seg = segments[0]
-            # 如果单个段落超过chunk_size，强制切分
-            # 或者即使小于chunk_size，如果有多个原始段落，也应该分段
+            # 如果单个段落超过chunk_size，或者原始有多个段落，强制切分
             if len(single_seg) > chunk_size or len(paragraphs) > 1:
-                logger.info(f"检测到只有1个分段但原始有{len(paragraphs)}个段落，强制按chunk_size={chunk_size}切分")
+                logger.info(f"检测到只有1个分段但原始有{len(paragraphs)}个段落，长度={len(single_seg)}，强制按chunk_size={chunk_size}切分")
                 segments = []
-                # 按句号切分
-                sentences = re.split(r'[。！？]', single_seg)
-                temp_chunk = ""
-                for sent in sentences:
-                    sent = sent.strip()
-                    if not sent:
-                        continue
-                    if len(temp_chunk) + len(sent) + 1 > chunk_size:
-                        if temp_chunk.strip():
-                            segments.append(temp_chunk.strip())
-                        temp_chunk = sent
-                    else:
-                        temp_chunk += sent + "。"
-                if temp_chunk.strip():
-                    segments.append(temp_chunk.strip())
                 
-                # 如果按句号切分后还是只有1段，尝试更激进的切分
-                if len(segments) == 1 and len(segments[0]) > chunk_size * 0.5:
-                    logger.info("按句号切分后仍只有1段，尝试按逗号切分")
-                    single_seg = segments[0]
-                    segments = []
-                    parts = re.split(r'[，；]', single_seg)
+                # 策略1：如果有多个原始段落，直接按原始段落分段（每2-3个一段）
+                if len(paragraphs) > 1:
+                    logger.info(f"按原始段落重新分段，共{len(paragraphs)}个段落")
                     temp_chunk = ""
-                    for part in parts:
-                        part = part.strip()
-                        if not part:
+                    para_in_chunk = 0
+                    for para in paragraphs:
+                        para = para.strip()
+                        if not para:
                             continue
-                        if len(temp_chunk) + len(part) + 1 > chunk_size:
+                        if para_in_chunk >= 2 or (temp_chunk and len(temp_chunk) + len(para) + 2 > chunk_size):
                             if temp_chunk.strip():
                                 segments.append(temp_chunk.strip())
-                            temp_chunk = part
+                            temp_chunk = para
+                            para_in_chunk = 1
                         else:
-                            temp_chunk += part + "，"
+                            if temp_chunk:
+                                temp_chunk += "\n\n" + para
+                            else:
+                                temp_chunk = para
+                            para_in_chunk += 1
                     if temp_chunk.strip():
                         segments.append(temp_chunk.strip())
+                
+                # 如果还是只有1段，按句号切分
+                if len(segments) == 1:
+                    logger.info("按句号切分")
+                    single_seg = segments[0]
+                    segments = []
+                    sentences = re.split(r'[。！？]', single_seg)
+                    temp_chunk = ""
+                    for sent in sentences:
+                        sent = sent.strip()
+                        if not sent:
+                            continue
+                        if len(temp_chunk) + len(sent) + 1 > chunk_size:
+                            if temp_chunk.strip():
+                                segments.append(temp_chunk.strip())
+                            temp_chunk = sent
+                        else:
+                            temp_chunk += sent + "。"
+                    if temp_chunk.strip():
+                        segments.append(temp_chunk.strip())
+                    
+                    # 如果按句号切分后还是只有1段，尝试更激进的切分
+                    if len(segments) == 1 and len(segments[0]) > chunk_size * 0.5:
+                        logger.info("按句号切分后仍只有1段，尝试按逗号切分")
+                        single_seg = segments[0]
+                        segments = []
+                        parts = re.split(r'[，；]', single_seg)
+                        temp_chunk = ""
+                        for part in parts:
+                            part = part.strip()
+                            if not part:
+                                continue
+                            if len(temp_chunk) + len(part) + 1 > chunk_size:
+                                if temp_chunk.strip():
+                                    segments.append(temp_chunk.strip())
+                                temp_chunk = part
+                            else:
+                                temp_chunk += part + "，"
+                        if temp_chunk.strip():
+                            segments.append(temp_chunk.strip())
         
         # 如果没有分到任何段落，使用整个文件内容
         if not segments:
