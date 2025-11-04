@@ -29,8 +29,63 @@ def get_knowledge_base():
     """延迟加载知识库，避免启动时内存不足"""
     global _knowledge_base
     if _knowledge_base is None:
-        _knowledge_base = FAISSKnowledgeBase()
+        try:
+            _knowledge_base = FAISSKnowledgeBase()
+        except (ImportError, FileNotFoundError) as e:
+            # 如果缺少依赖或模型文件，创建一个简化的知识库实现
+            logger.warning(f"知识库初始化失败: {str(e)}，将使用简化模式")
+            _knowledge_base = SimpleKnowledgeBase()
     return _knowledge_base
+
+
+class SimpleKnowledgeBase:
+    """简化的知识库实现，用于缺少依赖时"""
+    def __init__(self):
+        self.documents = []
+        self.metadatas = []
+        logger.info("使用简化知识库模式（无向量检索功能）")
+    
+    def get_all_settings(self):
+        return [(doc, meta) for doc, meta in zip(self.documents, self.metadatas)]
+    
+    def add_setting(self, setting_type: str, content: str):
+        self.documents.append(content)
+        self.metadatas.append({"type": setting_type})
+        return f"已添加设定：{setting_type}"
+    
+    def delete_setting(self, setting_id: int):
+        if 0 <= setting_id < len(self.documents):
+            self.documents.pop(setting_id)
+            self.metadatas.pop(setting_id)
+            return True
+        return False
+    
+    def clear_all_settings(self):
+        self.documents.clear()
+        self.metadatas.clear()
+        return "已清空所有设定"
+    
+    def search(self, query: str, top_k: int = 3):
+        # 简化实现：只返回文本匹配的结果
+        results = []
+        query_lower = query.lower()
+        for doc, meta in zip(self.documents, self.metadatas):
+            if query_lower in doc.lower():
+                results.append((doc, meta))
+        return results[:top_k]
+    
+    def search_relevant_settings(self, query: str, top_n: int = 3) -> list[str]:
+        """搜索相关设定（简化版本，使用文本匹配）"""
+        if not self.documents:
+            return []
+        query_lower = query.lower()
+        relevant = []
+        for doc in self.documents:
+            if query_lower in doc.lower():
+                relevant.append(doc)
+                if len(relevant) >= top_n:
+                    break
+        return relevant
 
 
 class StrategyFactory:

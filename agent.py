@@ -26,7 +26,7 @@ class TextContinuationAgent:
 
 
 class RAGTextContinuationAgent(TextContinuationAgent):
-    def __init__(self, model: BaseModel, strategy: BaseStrategy, knowledge_base: FAISSKnowledgeBase):
+    def __init__(self, model: BaseModel, strategy: BaseStrategy, knowledge_base):
         super().__init__(model, strategy)
         self.kb = knowledge_base
         self.tools = {
