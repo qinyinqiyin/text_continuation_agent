@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: text-continuation-agent
+    env: python
+    region: singapore  # 可选择：singapore, oregon, frankfurt, etc.
+    plan: free  # 免费计划
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHONUTF8
+        value: "1"
+      # 如果使用DashScope API嵌入服务，取消注释下面这行并设置你的API密钥
+      # - key: DASHSCOPE_API_KEY
+      #   value: your-dashscope-api-key-here
+      # - key: EMBEDDING_API_TYPE
+      #   value: dashscope
+    healthCheckPath: /api/health
+    # 可选：如果需要更大的内存，可以升级到starter计划
+    # plan: starter  # 512MB RAM, $7/月
+
