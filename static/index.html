@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本续写助手</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header>
+            <h1>📝 文本续写助手</h1>
+            <p class="subtitle">支持文章大纲阶段判断与续写 | MCP工具增强</p>
+        </header>
+
+        <!-- 标签页导航 -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="continuation">📝 文本续写</button>
+            <button class="tab-btn" data-tab="settings">⚙️ 设定管理</button>
+            <button class="tab-btn" data-tab="mcp-tools">🔧 MCP工具</button>
+        </div>
+
+        <!-- 文本续写标签页 -->
+        <div id="continuation" class="tab-content active">
+            <div class="card">
+                <h2>文本风格续写助手</h2>
+                
+                <div class="form-group">
+                    <label>阿里云DashScope API密钥</label>
+                    <input type="password" id="api-key" placeholder="请输入API密钥">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>续写风格</label>
+                        <select id="style">
+                            <option value="fantasy">奇幻风格</option>
+                            <option value="ancient">古风风格</option>
+                            <option value="sci-fi">科幻风格</option>
+                            <option value="EasternFantasy">玄幻风格</option>
+                            <option value="Suspense">悬疑风格</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>最大续写长度</label>
+                        <input type="range" id="max-length" min="100" max="5000" value="300" step="50">
+                        <span id="max-length-value">300</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>创造性</label>
+                        <input type="range" id="temperature" min="0" max="1" value="0.6" step="0.1">
+                        <span id="temperature-value">0.6</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="use-rag" checked> 启用RAG（参考设定/大纲）
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>前文参考</label>
+                    <textarea id="context" rows="8" placeholder="请输入需要续写的文本..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>续写要求</label>
+                    <input type="text" id="requirements" placeholder="例如：增加冲突，埋下伏笔...">
+                </div>
+
+                <button class="btn btn-primary" onclick="startContinuation()">🚀 开始续写</button>
+
+                <div id="continuation-result" class="result-area" style="display: none;">
+                    <h3>续写结果</h3>
+                    <div id="result-content" class="result-content"></div>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="mergeResult()">合并到前文继续续写</button>
+                        <button class="btn btn-secondary" onclick="downloadText()">💾 下载完整文本</button>
+                    </div>
+                </div>
+
+                <div id="loading" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>生成中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 设定管理标签页 -->
+        <div id="settings" class="tab-content">
+            <div class="card">
+                <h2>故事设定管理（RAG检索用）</h2>
+
+                <!-- 知识库统计 -->
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <span id="kb-total-count">0</span> 条设定
+                    </div>
+                    <button class="btn btn-danger" onclick="clearAllSettings()">🗑️ 一键清空知识库</button>
+                </div>
+
+                <hr>
+
+                <!-- 文件上传 -->
+                <h3>📄 上传已有文章（TXT文件）</h3>
+                <div class="form-group">
+                    <input type="file" id="file-upload" accept=".txt" onchange="handleFileSelect(event)">
+                    <div id="file-info" class="file-info" style="display: none;"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>分段长度（字符）</label>
+                            <input type="number" id="chunk-size" value="1000" min="500" max="5000" step="500">
+                        </div>
+                        <div class="form-group">
+                            <label>重叠长度（字符）</label>
+                            <input type="number" id="overlap-size" value="200" min="0" max="500" step="50">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="upload-btn" onclick="uploadArticle()" disabled>✅ 添加文章到知识库</button>
+                </div>
+
+                <hr>
+
+                <!-- 添加新设定 -->
+                <h3>✍️ 手动添加新设定</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>设定类型</label>
+                        <select id="setting-type">
+                            <option value="角色设定">角色设定</option>
+                            <option value="世界观设定">世界观设定</option>
+                            <option value="关键物品设定">关键物品设定</option>
+                            <option value="情节限制">情节限制</option>
+                            <option value="文章大纲">文章大纲</option>
+                            <option value="已有文章">已有文章</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>设定内容</label>
+                        <textarea id="setting-content" rows="5" placeholder="请输入设定内容..."></textarea>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="addSetting()">添加设定</button>
+
+                <hr>
+
+                <!-- 已添加的设定列表 -->
+                <h3>已添加的设定</h3>
+                <div id="settings-list" class="settings-list">
+                    <p class="empty-message">尚未添加任何设定</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- MCP工具标签页 -->
+        <div id="mcp-tools" class="tab-content">
+            <div class="card">
+                <h2>🔧 MCP工具中心</h2>
+                <p class="subtitle">使用标准化的MCP工具增强文本续写功能</p>
+
+                <!-- 工具子标签 -->
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active" data-subtab="filesystem">📁 文件系统工具</button>
+                    <button class="sub-tab-btn" data-subtab="text-analysis">📊 文本分析工具</button>
+                </div>
+
+                <!-- 文件系统工具 -->
+                <div id="filesystem" class="sub-tab-content active">
+                    <h3>📁 文件系统操作</h3>
+                    <div class="form-group">
+                        <label>选择操作</label>
+                        <select id="fs-action" onchange="handleFsActionChange()">
+                            <option value="import">批量导入文章</option>
+                            <option value="backup">备份知识库</option>
+                            <option value="restore">恢复知识库</option>
+                            <option value="list">列出文件</option>
+                        </select>
+                    </div>
+
+                    <div id="fs-action-content"></div>
+                </div>
+
+                <!-- 文本分析工具 -->
+                <div id="text-analysis" class="sub-tab-content">
+                    <h3>📊 文本分析</h3>
+                    <div class="form-group">
+                        <label>分析类型</label>
+                        <select id="analysis-action">
+                            <option value="quality_score">质量评分</option>
+                            <option value="style_detection">风格检测</option>
+                            <option value="coherence_check">连贯性检查</option>
+                            <option value="duplicate_detection">重复检测</option>
+                            <option value="sentiment_analysis">情感分析</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>待分析文本</label>
+                        <textarea id="analysis-text" rows="8" placeholder="输入需要分析的文本..."></textarea>
+                    </div>
+
+                    <div id="analysis-ref-container" class="form-group" style="display: none;">
+                        <label>参考文本</label>
+                        <textarea id="analysis-ref" rows="5" placeholder="输入参考文本（用于对比）..."></textarea>
+                    </div>
+
+                    <div id="analysis-style-container" class="form-group" style="display: none;">
+                        <label>目标风格</label>
+                        <select id="analysis-style">
+                            <option value="fantasy">奇幻风格</option>
+                            <option value="ancient">古风风格</option>
+                            <option value="sci-fi">科幻风格</option>
+                            <option value="EasternFantasy">玄幻风格</option>
+                            <option value="Suspense">悬疑风格</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="analyzeText()">🔍 开始分析</button>
+
+                    <div id="analysis-result" class="result-area" style="display: none;">
+                        <h3>分析结果</h3>
+                        <div id="analysis-result-content"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,39 @@
+# Python缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# 日志
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.bak
+
+# 大文件（如果不需要）
+# bert-base-chinese/
+
+# 已删除的旧版本文件（注释保留）
+# main.py - Streamlit版本已删除
+# Procfile, runtime.txt - Railway/Render配置已删除
+# Dockerfile, docker-compose.yml - Docker配置已删除
+# gunicorn_config.py - Gunicorn配置已删除
+
