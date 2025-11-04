@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 import json
+import re
 from config import logger
 from models import APIModel
 from strategies import (
@@ -308,7 +309,6 @@ def upload_article():
         
         if not paragraphs:
             # 如果还是没有，尝试按句号分段
-            import re
             sentences = re.split(r'[。！？\n]', file_content)
             paragraphs = [s.strip() for s in sentences if s.strip() and len(s.strip()) > 10]
         
@@ -333,7 +333,6 @@ def upload_article():
                         current_chunk = ""
                     
                     # 切分超长段落
-                    import re
                     # 尝试按句号切分
                     sentences = re.split(r'[。！？]', para_text)
                     temp_chunk = ""
