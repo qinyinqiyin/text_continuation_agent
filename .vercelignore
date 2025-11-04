@@ -28,8 +28,12 @@ logs/
 *.tmp
 *.bak
 
-# 大文件（如果不需要）
-# bert-base-chinese/
+# 大文件和模型目录（排除以避免构建时OOM）
+bert-base-chinese/
+*.pkl
+*.bin
+*.pt
+*.pth
 
 # 已删除的旧版本文件（注释保留）
 # main.py - Streamlit版本已删除

@@ -20,9 +20,17 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)  # 允许跨域请求
 
 # 全局状态管理（在实际生产环境中应使用Redis或数据库）
-knowledge_base = FAISSKnowledgeBase()
+# 延迟加载knowledge_base以避免启动时加载大型模型导致OOM
+_knowledge_base = None
 agent_cache = {}  # 缓存Agent实例
 mcp_registry = create_mcp_registry()
+
+def get_knowledge_base():
+    """延迟加载知识库，避免启动时内存不足"""
+    global _knowledge_base
+    if _knowledge_base is None:
+        _knowledge_base = FAISSKnowledgeBase()
+    return _knowledge_base
 
 
 class StrategyFactory:
@@ -46,7 +54,7 @@ def get_or_create_agent(api_key: str, style: str):
     if cache_key not in agent_cache:
         model = APIModel(api_key=api_key)
         strategy = StrategyFactory.get_strategy(style)
-        agent = RAGTextContinuationAgent(model, strategy, knowledge_base)
+        agent = RAGTextContinuationAgent(model, strategy, get_knowledge_base())
         agent_cache[cache_key] = agent
     return agent_cache[cache_key]
 
@@ -113,7 +121,7 @@ def continuation():
 def get_settings():
     """获取所有设定"""
     try:
-        all_settings = knowledge_base.get_all_settings()
+        all_settings = get_knowledge_base().get_all_settings()
         settings_list = []
         for idx, (doc, meta) in enumerate(all_settings):
             settings_list.append({
@@ -137,7 +145,7 @@ def add_setting():
         if not setting_type or not content:
             return jsonify({"success": False, "error": "设定类型和内容不能为空"}), 400
         
-        msg = knowledge_base.add_setting(setting_type, content)
+        msg = get_knowledge_base().add_setting(setting_type, content)
         return jsonify({"success": True, "message": msg})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -147,7 +155,7 @@ def add_setting():
 def delete_setting(setting_id):
     """删除设定"""
     try:
-        success = knowledge_base.delete_setting(setting_id)
+        success = get_knowledge_base().delete_setting(setting_id)
         if success:
             return jsonify({"success": True, "message": "删除成功"})
         else:
@@ -160,7 +168,7 @@ def delete_setting(setting_id):
 def clear_settings():
     """清空所有设定"""
     try:
-        msg = knowledge_base.clear_all_settings()
+        msg = get_knowledge_base().clear_all_settings()
         agent_cache.clear()  # 清空Agent缓存
         return jsonify({"success": True, "message": msg})
     except Exception as e:
@@ -171,7 +179,7 @@ def clear_settings():
 def get_kb_stats():
     """获取知识库统计信息"""
     try:
-        all_settings = knowledge_base.get_all_settings()
+        all_settings = get_knowledge_base().get_all_settings()
         type_counts = {}
         for _, meta in all_settings:
             setting_type = meta.get("type", "未知")
@@ -226,7 +234,7 @@ def upload_article():
         success_count = 0
         for i, seg in enumerate(segments):
             if seg.strip() and len(seg.strip()) > 50:
-                knowledge_base.add_setting(
+                get_knowledge_base().add_setting(
                     "已有文章", f"[段落 {i+1}/{len(segments)}]\n{seg}"
                 )
                 success_count += 1
