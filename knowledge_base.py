@@ -14,43 +14,29 @@ except ImportError:
 
 class FAISSKnowledgeBase:
     def __init__(self, model_name: str = "bert-base-chinese", local_dir: str = None, 
-                 use_api: bool = True, api_type: str = "dashscope", api_key: str = None):
+                 use_api: bool = False, api_type: str = "dashscope", api_key: str = None):
         """
         初始化知识库
-        :param model_name: 本地模型名称（仅在use_api=False时使用）
+        :param model_name: 本地模型名称
         :param local_dir: 本地模型目录
-        :param use_api: 是否使用API嵌入服务（推荐，避免加载大型模型）
-        :param api_type: API类型，"dashscope", "huggingface", "openai"
-        :param api_key: API密钥
+        :param use_api: 是否使用API嵌入服务（已禁用，仅使用本地模型）
+        :param api_type: API类型（已禁用）
+        :param api_key: API密钥（已禁用）
         """
-        # 优先使用API嵌入模型
+        # 仅使用本地BERT模型
         if use_api:
-            try:
-                from embedding_api import HybridEmbeddingModel
-                self.embedding_model = HybridEmbeddingModel(
-                    api_type=api_type,
-                    api_key=api_key,
-                    local_model_name=model_name,
-                    local_dir=local_dir
-                )
-                self.target_dim = self.embedding_model.dimension
-                logger.info(f"使用API嵌入模型: {api_type}")
-            except Exception as e:
-                logger.warning(f"API嵌入模型初始化失败: {str(e)}，尝试使用本地模型")
-                use_api = False
+            logger.warning("API嵌入服务已禁用，强制使用本地BERT模型")
         
-        # Fallback到本地模型
-        if not use_api:
-            try:
-                from embedding import PyTorchEmbeddingModel
-                if local_dir is None:
-                    local_dir = os.path.dirname(os.path.abspath(__file__))
-                self.embedding_model = PyTorchEmbeddingModel(model_name, local_dir)
-                self.target_dim = self.embedding_model.dimension
-                logger.info(f"使用本地嵌入模型: {model_name}")
-            except Exception as e:
-                logger.error(f"本地嵌入模型初始化失败: {str(e)}")
-                raise
+        try:
+            from embedding import PyTorchEmbeddingModel
+            if local_dir is None:
+                local_dir = os.path.dirname(os.path.abspath(__file__))
+            self.embedding_model = PyTorchEmbeddingModel(model_name, local_dir)
+            self.target_dim = self.embedding_model.dimension
+            logger.info(f"✅ 使用本地BERT嵌入模型: {model_name}")
+        except Exception as e:
+            logger.error(f"本地嵌入模型初始化失败: {str(e)}")
+            raise
         
         # 初始化索引
         if FAISS_AVAILABLE:
