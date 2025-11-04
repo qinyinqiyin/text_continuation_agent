@@ -65,25 +65,43 @@ python app.py
 streamlit run main.py
 ```
 
-## 部署到Vercel
+## 部署选项
 
-1. **推送代码到GitHub**
-```bash
-git add .
-git commit -m "准备部署"
-git push origin main
-```
+### 选项1: Vercel（推荐用于静态/轻量应用）
 
-2. **在Vercel导入项目**
-   - 访问 https://vercel.com
-   - 连接GitHub仓库
-   - 自动部署
-
-3. **配置环境变量**（可选）
-   - `FLASK_ENV`: `production`
-   - `PYTHONUTF8`: `1`
+**优点**：快速部署，全球CDN，自动HTTPS  
+**缺点**：构建时内存限制严格，不适合大型依赖
 
 详细部署说明请查看 [VERCEL_DEPLOY.md](VERCEL_DEPLOY.md)
+
+### 选项2: Railway（推荐用于需要向量检索的应用）⭐
+
+**优点**：
+- ✅ 构建时内存充足，不会OOM
+- ✅ 支持安装PyTorch等大型依赖
+- ✅ 自动部署，配置简单
+- ✅ 每月$5免费额度
+
+**快速部署**：
+1. 访问 https://railway.app
+2. 使用GitHub账号登录
+3. 创建新项目，选择你的仓库
+4. Railway自动检测Python项目并部署
+5. 配置环境变量（如 `DASHSCOPE_API_KEY`）
+
+### 选项3: Render
+
+**优点**：免费PostgreSQL数据库，文档完善  
+**缺点**：免费服务有冷启动（15分钟不活跃会休眠）
+
+### 其他平台
+
+更多部署平台对比和详细说明请查看 [DEPLOYMENT_PLATFORMS.md](DEPLOYMENT_PLATFORMS.md)
+
+**推荐**：
+- 🥇 **Railway** - 最适合需要向量检索功能的项目
+- 🥈 **Render** - 适合需要数据库的项目
+- 🥉 **Google Cloud Run** - 适合生产环境
 
 ## 项目结构
 
