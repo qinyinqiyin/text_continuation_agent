@@ -1,7 +1,6 @@
 from base_classes import BaseModel, BaseStrategy
 from knowledge_base import FAISSKnowledgeBase
 from config import logger
-from modelscope.preprocessors.templates.tools_prompt import tools_prompt
 from tools import (
     PlotConflictDetectorTool, HistoryRetrievalTool
 )
