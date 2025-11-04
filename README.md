@@ -72,7 +72,7 @@ streamlit run main.py
 **优点**：快速部署，全球CDN，自动HTTPS  
 **缺点**：构建时内存限制严格，不适合大型依赖
 
-详细部署说明请查看 [VERCEL_DEPLOY.md](VERCEL_DEPLOY.md)
+详细部署说明请查看项目文档
 
 ### 选项2: Railway（推荐用于需要向量检索的应用）⭐
 
@@ -96,7 +96,7 @@ streamlit run main.py
 
 ### 其他平台
 
-更多部署平台对比和详细说明请查看 [DEPLOYMENT_PLATFORMS.md](DEPLOYMENT_PLATFORMS.md)
+支持部署到 Render、Vercel 等平台
 
 **推荐**：
 - 🥇 **Railway** - 最适合需要向量检索功能的项目
@@ -143,7 +143,7 @@ text_continuation_agent/
 - **文件系统工具**：批量导入、备份/恢复知识库
 - **文本分析工具**：质量评分、风格检测、连贯性检查
 
-详细使用说明请查看 [MCP_TOOLS_README.md](MCP_TOOLS_README.md)
+MCP工具提供文件系统和文本分析功能
 
 ## API接口
 
