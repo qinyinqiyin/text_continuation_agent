@@ -17,11 +17,6 @@
   "env": {
     "FLASK_ENV": "production",
     "PYTHONUTF8": "1"
-  },
-  "functions": {
-    "api/index.py": {
-      "maxDuration": 60
-    }
   }
 }
 
