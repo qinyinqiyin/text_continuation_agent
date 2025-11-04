@@ -30,8 +30,17 @@ def get_knowledge_base():
     global _knowledge_base
     if _knowledge_base is None:
         try:
-            _knowledge_base = FAISSKnowledgeBase()
-        except (ImportError, FileNotFoundError) as e:
+            # 优先使用API嵌入服务（推荐用于Vercel）
+            # 从环境变量获取API密钥
+            api_key = os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("HF_API_KEY")
+            api_type = os.getenv("EMBEDDING_API_TYPE", "dashscope")  # dashscope, openai, huggingface
+            
+            _knowledge_base = FAISSKnowledgeBase(
+                use_api=True,  # 使用API嵌入服务
+                api_type=api_type,
+                api_key=api_key
+            )
+        except (ImportError, FileNotFoundError, Exception) as e:
             # 如果缺少依赖或模型文件，创建一个简化的知识库实现
             logger.warning(f"知识库初始化失败: {str(e)}，将使用简化模式")
             _knowledge_base = SimpleKnowledgeBase()

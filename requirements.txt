@@ -3,12 +3,14 @@ flask-cors>=4.0.0
 gunicorn>=21.2.0
 dashscope>=1.19.3
 python-dotenv>=1.0.0
-# 以下依赖用于知识库功能（可选，如果内存不足可以先注释掉）
-# 在Vercel Serverless环境中，可以暂时禁用知识库功能以避免构建时OOM
+requests>=2.31.0
+numpy>=1.24.0
+# 以下依赖用于向量检索（推荐使用API嵌入服务，无需安装）
+# 如果使用API嵌入服务（推荐，见VECTOR_SEARCH_GUIDE.md），无需安装以下依赖
+# 如果必须使用本地模型，取消注释以下依赖（可能导致Vercel构建OOM）
 # torch>=2.0.0,<3.0.0
 # transformers>=4.30.0,<5.0.0
-# faiss-cpu>=1.7.4
-# numpy>=1.24.0
+# faiss-cpu>=1.7.4  # 可选，不安装会使用numpy进行向量检索
 # modelscope>=1.9.0
 
 
