@@ -31,36 +31,34 @@ def get_knowledge_base():
     global _knowledge_base
     if _knowledge_base is None:
         try:
-            # 优先尝试使用本地模型（如果有依赖和模型文件）
+            # 优先尝试使用本地模型（embedding.py会自动下载）
             # 如果没有本地模型，fallback到API嵌入服务
             api_key = os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("HF_API_KEY")
             api_type = os.getenv("EMBEDDING_API_TYPE", "dashscope")
             
-            # 检查是否有本地模型文件
-            model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bert-base-chinese")
-            has_local_model = os.path.exists(model_dir) and os.path.exists(
-                os.path.join(model_dir, "pytorch_model.bin")
-            )
-            
-            if has_local_model:
-                # 使用本地模型
+            # 优先尝试使用本地模型（即使文件不存在，embedding.py会自动下载）
+            try:
+                logger.info("尝试初始化本地BERT模型（如果文件不存在会自动下载）...")
                 _knowledge_base = FAISSKnowledgeBase(
-                    use_api=False,  # 使用本地模型
+                    use_api=False,  # 使用本地模型，embedding.py会自动下载
                     model_name="bert-base-chinese"
                 )
-                logger.info("使用本地BERT模型进行向量检索")
-            elif api_key:
-                # Fallback到API嵌入服务
-                _knowledge_base = FAISSKnowledgeBase(
-                    use_api=True,
-                    api_type=api_type,
-                    api_key=api_key
-                )
-                logger.info(f"使用API嵌入服务: {api_type}")
-            else:
-                # 既没有本地模型也没有API密钥，使用简化模式
-                logger.warning("未找到本地模型且未配置API密钥，将使用简化模式")
-                _knowledge_base = SimpleKnowledgeBase()
+                logger.info("✅ 使用本地BERT模型进行向量检索")
+            except Exception as local_error:
+                logger.warning(f"本地模型初始化失败: {str(local_error)}")
+                # 如果本地模型失败，尝试API嵌入服务
+                if api_key:
+                    logger.info(f"尝试使用API嵌入服务: {api_type}")
+                    _knowledge_base = FAISSKnowledgeBase(
+                        use_api=True,
+                        api_type=api_type,
+                        api_key=api_key
+                    )
+                    logger.info(f"✅ 使用API嵌入服务: {api_type}")
+                else:
+                    # 既没有本地模型也没有API密钥，使用简化模式
+                    logger.warning("未找到本地模型且未配置API密钥，将使用简化模式")
+                    _knowledge_base = SimpleKnowledgeBase()
         except (ImportError, FileNotFoundError, Exception) as e:
             # 如果初始化失败，fallback到简化模式
             logger.warning(f"知识库初始化失败: {str(e)}，将使用简化模式")
