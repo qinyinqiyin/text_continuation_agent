@@ -1,4 +1,19 @@
 import logging
+import os
+
+# 从环境变量或 .env 加载配置（需 python-dotenv）
+try:
+    from dotenv import load_dotenv
+    _root = os.path.dirname(os.path.abspath(__file__))
+    env_path = os.path.join(_root, ".env")
+    loaded = load_dotenv(env_path)
+    if not loaded and not os.environ.get("DASHSCOPE_API_KEY"):
+        load_dotenv()  # 回退：从当前工作目录加载
+except ImportError:
+    pass
+
+# DashScope API 密钥（续写 LLM + 通义 Embedding 共用），去除首尾空格
+DASHSCOPE_API_KEY = (os.environ.get("DASHSCOPE_API_KEY", "") or "").strip()
 
 # 配置日志
 logging.basicConfig(

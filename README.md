@@ -6,17 +6,17 @@
 
 - 📝 **多风格续写**：支持奇幻、古风、科幻、玄幻、悬疑5种风格
 - 🧠 **RAG增强**：基于FAISS向量数据库的知识库检索
-- 🔧 **MCP工具集成**：文件系统和文本分析工具
-- 🌐 **Web界面**：现代化的Flask + 前端架构
+- 🔧 **Function Call 工具**：文件系统和文本分析工具
+- 🌐 **Web界面**：现代化的 FastAPI + 前端架构
 - ☁️ **Vercel部署**：一键部署到Vercel平台
 
 ## 技术栈
 
-- **后端**：Flask + Python
+- **后端**：FastAPI + LangChain（接收请求、返回 JSON）
 - **前端**：HTML + CSS + JavaScript
-- **AI模型**：阿里云DashScope API（通义千问）
+- **AI 流程**：LangChain LCEL / RAG / Agent → 阿里云 DashScope（通义千问）
 - **向量数据库**：FAISS
-- **嵌入模型**：BERT-base-chinese
+- **嵌入模型**：通义 embedding（text-embedding-v2，1536维）
 
 ## 快速开始
 
@@ -32,37 +32,29 @@ conda activate myenv  # 或创建新环境
 pip install -r requirements.txt
 ```
 
-### 3. 下载模型文件
+### 3. 配置 API 密钥
 
-由于GitHub文件大小限制，BERT模型文件需要单独下载：
+在项目根目录创建 `.env` 或设置环境变量：
 
 ```bash
-# 方法1：使用Hugging Face
-git lfs install
-git clone https://huggingface.co/bert-base-chinese bert-base-chinese
-
-# 方法2：手动下载
-# 访问 https://huggingface.co/bert-base-chinese
-# 下载 pytorch_model.bin 到 bert-base-chinese/ 目录
+cp .env.example .env
+# 编辑 .env，填入 DASHSCOPE_API_KEY=sk-xxx
 ```
 
-需要的文件：
-- `bert-base-chinese/pytorch_model.bin` (约392MB)
-- `bert-base-chinese/config.json`
-- `bert-base-chinese/vocab.txt`
+密钥从 [阿里云 DashScope 控制台](https://dashscope.console.aliyun.com/) 获取。
 
 ### 4. 运行项目
 
-**本地开发：**
+**推荐：FastAPI**
 ```bash
-python app.py
+python main.py
 ```
 
-访问：http://localhost:5000
+访问：http://localhost:8000
 
-**使用Streamlit（旧版本）：**
+**或使用 uvicorn：**
 ```bash
-streamlit run main.py
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 ## 部署选项
@@ -87,7 +79,7 @@ streamlit run main.py
 2. 使用GitHub账号登录
 3. 创建新项目，选择你的仓库
 4. Railway自动检测Python项目并部署
-5. 配置环境变量（如 `DASHSCOPE_API_KEY`）
+5. 配置环境变量：`DASHSCOPE_API_KEY`（续写 + 嵌入共用）
 
 ### 选项3: Render
 
@@ -107,19 +99,20 @@ streamlit run main.py
 
 ```
 text_continuation_agent/
-├── api/
-│   └── index.py              # Vercel Serverless Function入口
-├── static/                   # 前端文件
-│   ├── index.html
-│   ├── style.css
-│   └── app.js
-├── agent.py                  # Agent核心逻辑
-├── app.py                    # Flask应用（主应用）
-├── knowledge_base.py         # FAISS知识库
-├── models.py                 # AI模型接口
-├── strategies.py             # 续写策略
-├── mcp_tools.py             # MCP工具集成
-└── requirements.txt          # Python依赖
+├── main.py              # FastAPI 入口、RAGAgent、全部 API 路由
+├── config.py            # DASHSCOPE_API_KEY、logger
+├── base_classes.py      # BaseModel、BaseStrategy
+├── embedding.py         # 通义 text-embedding-v2
+├── langchain_llm.py     # LangChain Tongyi
+├── strategies.py        # 5 种续写策略
+├── knowledge_base.py    # FAISS 知识库
+├── tools.py             # StoryTools（冲突检测、状态管理）
+├── function_call.py     # Function Call 工具
+├── eval_embedding.py    # 嵌入模型评估（可选）
+├── api/index.py         # Vercel 入口
+├── static/              # 前端
+├── 函数手册与路径图.md
+└── 技术文档.md
 ```
 
 ## 使用说明
@@ -138,12 +131,10 @@ text_continuation_agent/
 - **上传文章**：批量上传TXT文件，自动分段
 - **RAG检索**：续写时自动检索相关知识库内容
 
-### MCP工具
+### Function Call 工具
 
 - **文件系统工具**：批量导入、备份/恢复知识库
 - **文本分析工具**：质量评分、风格检测、连贯性检查
-
-MCP工具提供文件系统和文本分析功能
 
 ## API接口
 
@@ -160,18 +151,17 @@ DELETE /api/knowledge-base/settings/:id  # 删除设定
 POST   /api/knowledge-base/upload       # 上传文章
 ```
 
-### MCP工具
+### Function Call 工具
 ```
-GET  /api/mcp/tools              # 列出工具
-POST /api/mcp/tools/:name        # 执行工具
-POST /api/mcp/analyze            # 文本分析
+GET  /api/tools                   # 列出工具
+POST /api/tools/:name             # 执行工具
+POST /api/tools/analyze           # 文本分析
 ```
 
 ## 注意事项
 
-1. **API密钥**：需要阿里云DashScope API密钥，用户在前端输入，不会存储到服务器
-2. **知识库数据**：在Vercel部署时，知识库数据不会持久化（Serverless环境限制）
-3. **模型文件**：BERT模型文件较大，需要单独下载或使用Git LFS
+1. **API 密钥**：在 `config` 或 `.env` 中配置 `DASHSCOPE_API_KEY`，用于续写和嵌入
+3. **知识库数据**：Serverless 环境下知识库不持久化
 
 ## 许可证
 
@@ -183,10 +173,15 @@ MIT License
 
 ## 更新日志
 
+### v2.1.0
+- ✅ Flask → LangChain LCEL / RAG → DashScope 流程
+- ✅ 嵌入模型改用 HuggingFace API（acge_text_embedding，MTEB 中文榜第一）
+- ✅ 无 HF Token 时自动回退到本地 BERT
+
 ### v2.0.0
 - ✅ 迁移到Flask + 前端架构
 - ✅ 添加Vercel部署支持
-- ✅ 集成MCP工具框架
+- ✅ 集成 Function Call 工具框架
 - ✅ 优化用户界面
 
 ### v1.0.0

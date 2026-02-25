@@ -29,7 +29,6 @@ logs/
 *.bak
 
 # 大文件和模型目录（排除以避免构建时OOM）
-bert-base-chinese/
 *.pkl
 *.bin
 *.pt

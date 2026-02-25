@@ -1,128 +1,12 @@
 // 全局状态
 let continuationHistory = '';
 let currentResult = '';
-let currentApiKey = '';
 let currentStyle = 'fantasy';
 
-// API基础URL - 自动检测环境
-// 开发环境使用localhost，生产环境使用相对路径
-const API_BASE = window.location.hostname === 'localhost' 
-    ? 'http://localhost:5000/api' 
-    : '/api';
-
-// ==================== API密钥加密存储 ====================
-
-// 简单的加密函数（使用XOR加密 + Base64编码）
-function encryptApiKey(key) {
-    if (!key) return '';
-    // 使用一个简单的密钥（实际应用中可以使用更复杂的方法）
-    const secret = 'TextContinuationAgent2024';
-    let encrypted = '';
-    for (let i = 0; i < key.length; i++) {
-        encrypted += String.fromCharCode(key.charCodeAt(i) ^ secret.charCodeAt(i % secret.length));
-    }
-    return btoa(encrypted); // Base64编码
-}
-
-// 解密函数
-function decryptApiKey(encrypted) {
-    if (!encrypted) return '';
-    try {
-        const encoded = atob(encrypted); // Base64解码
-        const secret = 'TextContinuationAgent2024';
-        let decrypted = '';
-        for (let i = 0; i < encoded.length; i++) {
-            decrypted += String.fromCharCode(encoded.charCodeAt(i) ^ secret.charCodeAt(i % secret.length));
-        }
-        return decrypted;
-    } catch (e) {
-        console.error('解密失败:', e);
-        return '';
-    }
-}
-
-// 保存API密钥到localStorage
-function saveApiKey(key) {
-    if (!key || !key.trim()) return;
-    try {
-        const encrypted = encryptApiKey(key);
-        localStorage.setItem('api_key_encrypted', encrypted);
-        localStorage.setItem('remember_key', 'true');
-        console.log('API密钥已加密保存');
-    } catch (e) {
-        console.error('保存密钥失败:', e);
-    }
-}
-
-// 从localStorage读取API密钥
-function loadApiKey() {
-    try {
-        const encrypted = localStorage.getItem('api_key_encrypted');
-        const remember = localStorage.getItem('remember_key') === 'true';
-        if (encrypted && remember) {
-            const decrypted = decryptApiKey(encrypted);
-            if (decrypted) {
-                document.getElementById('api-key').value = decrypted;
-                document.getElementById('remember-key').checked = true;
-                return decrypted;
-            }
-        }
-    } catch (e) {
-        console.error('读取密钥失败:', e);
-    }
-    return '';
-}
-
-// 清除保存的API密钥
-function clearSavedKey() {
-    if (confirm('确定要清除已保存的API密钥吗？')) {
-        localStorage.removeItem('api_key_encrypted');
-        localStorage.removeItem('remember_key');
-        document.getElementById('api-key').value = '';
-        document.getElementById('remember-key').checked = false;
-        alert('已清除保存的API密钥');
-    }
-}
-
-// 页面加载时自动填充密钥
-function initApiKeyStorage() {
-    // 确保元素已加载
-    const apiKeyInput = document.getElementById('api-key');
-    const rememberCheckbox = document.getElementById('remember-key');
-    
-    if (!apiKeyInput || !rememberCheckbox) {
-        // 如果元素还没加载，延迟执行
-        setTimeout(initApiKeyStorage, 100);
-        return;
-    }
-    
-    // 加载保存的密钥
-    loadApiKey();
-    
-    // 监听API密钥输入框的变化，如果勾选了记住，则自动保存
-    apiKeyInput.addEventListener('blur', function() {
-        if (rememberCheckbox.checked && apiKeyInput.value.trim()) {
-            saveApiKey(apiKeyInput.value);
-        }
-    });
-    
-    rememberCheckbox.addEventListener('change', function() {
-        if (this.checked && apiKeyInput.value.trim()) {
-            saveApiKey(apiKeyInput.value);
-        } else if (!this.checked) {
-            localStorage.removeItem('api_key_encrypted');
-            localStorage.removeItem('remember_key');
-        }
-    });
-}
-
-// 页面加载完成后初始化
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApiKeyStorage);
-} else {
-    // DOM已经加载完成
-    initApiKeyStorage();
-}
+// API基础URL - 通过 FastAPI 访问时用相对路径；file:// 时回退到 8000 端口
+const API_BASE = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
+    ? '/api'
+    : 'http://127.0.0.1:8000/api';
 
 // 统一的响应处理函数
 async function handleResponse(response) {
@@ -200,26 +84,17 @@ document.getElementById('temperature').addEventListener('input', (e) => {
 });
 
 async function startContinuation() {
-    const apiKey = document.getElementById('api-key').value;
     const style = document.getElementById('style').value;
     const context = document.getElementById('context').value;
     const requirements = document.getElementById('requirements').value;
     const maxLength = parseInt(document.getElementById('max-length').value);
     const temperature = parseFloat(document.getElementById('temperature').value);
-    const useRag = document.getElementById('use-rag').checked;
-    const rememberKey = document.getElementById('remember-key').checked;
-    
-    if (!apiKey || !context.trim()) {
-        alert('请完善API密钥和前文内容');
+
+    if (!context.trim()) {
+        alert('请输入前文内容');
         return;
     }
     
-    // 如果勾选了记住密钥，则保存
-    if (rememberKey && apiKey.trim()) {
-        saveApiKey(apiKey);
-    }
-    
-    currentApiKey = apiKey;
     currentStyle = style;
     
     // 显示加载
@@ -233,13 +108,11 @@ async function startContinuation() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                api_key: apiKey,
                 style: style,
                 context: context,
                 requirements: requirements,
                 max_length: maxLength,
-                temperature: temperature,
-                use_rag: useRag
+                temperature: temperature
             })
         });
         
@@ -260,7 +133,10 @@ async function startContinuation() {
         }
     } catch (error) {
         console.error('续写请求错误:', error);
-        alert('请求失败：' + error.message);
+        const msg = error.message === 'Failed to fetch' || error.message.includes('fetch')
+            ? '请求失败：网络连接被重置。\n\n首次续写需加载模型约 1–2 分钟，请等待服务启动完成后再试，或稍后重试。'
+            : '请求失败：' + error.message;
+        alert(msg);
     } finally {
         document.getElementById('loading').style.display = 'none';
     }
@@ -503,13 +379,12 @@ async function uploadArticle() {
         return;
     }
     
-    const chunkSize = parseInt(document.getElementById('chunk-size').value);
-    const overlapSize = parseInt(document.getElementById('overlap-size').value);
+    // 获取设定类型
+    const settingType = document.getElementById('upload-setting-type').value;
     
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('chunk_size', chunkSize);
-    formData.append('overlap_size', overlapSize);
+    formData.append('setting_type', settingType);  // 添加设定类型参数
     
     document.getElementById('upload-btn').disabled = true;
     document.getElementById('upload-btn').textContent = '上传中...';
@@ -522,30 +397,35 @@ async function uploadArticle() {
         
         if (!response.ok) {
             const errorText = await response.text().catch(() => '未知错误');
-            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
+            let errMsg = errorText;
+            try {
+                const errJson = JSON.parse(errorText);
+                if (errJson.error) errMsg = errJson.error;
+            } catch (_) {}
+            throw new Error(errMsg);
         }
         
         const data = await handleResponse(response);
         
         if (data.success) {
-            alert(`上传成功！共分割为 ${data.segments_count} 个段落`);
+            alert(`上传成功！${data.message || `共分割为 ${data.segments_count} 个片段`}`);
             selectedFile = null;
             document.getElementById('file-upload').value = '';
             document.getElementById('file-info').style.display = 'none';
             loadSettings();
             loadKBStats();
         } else {
-            alert('上传失败：' + data.error);
+            alert('上传失败：' + (data.error || '未知错误'));
         }
     } catch (error) {
         alert('请求失败：' + error.message);
     } finally {
         document.getElementById('upload-btn').disabled = false;
-        document.getElementById('upload-btn').textContent = '✅ 添加文章到知识库';
+        document.getElementById('upload-btn').textContent = '添加到知识库';
     }
 }
 
-// ==================== MCP工具 ====================
+// ==================== Function Call 工具 ====================
 
 function handleFsActionChange() {
     const action = document.getElementById('fs-action').value;
@@ -609,7 +489,7 @@ async function importDirectory() {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/mcp/tools/filesystem`, {
+        const response = await fetch(`${API_BASE}/tools/filesystem`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -643,7 +523,7 @@ async function backupKB() {
     const path = document.getElementById('backup-path').value;
     
     try {
-        const response = await fetch(`${API_BASE}/mcp/tools/filesystem`, {
+        const response = await fetch(`${API_BASE}/tools/filesystem`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -686,7 +566,7 @@ async function restoreKB() {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/mcp/tools/filesystem`, {
+        const response = await fetch(`${API_BASE}/tools/filesystem`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -720,7 +600,7 @@ async function listFiles() {
     const path = document.getElementById('list-path').value;
     
     try {
-        const response = await fetch(`${API_BASE}/mcp/tools/filesystem`, {
+        const response = await fetch(`${API_BASE}/tools/filesystem`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -794,7 +674,7 @@ async function analyzeText() {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/mcp/tools/text_analysis`, {
+        const response = await fetch(`${API_BASE}/tools/text_analysis`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -836,8 +716,21 @@ function escapeHtml(text) {
 
 // ==================== 初始化 ====================
 
+// 检测后端连接，失败时提示用户
+async function checkConnection() {
+    try {
+        const res = await fetch(`${API_BASE}/health`, { method: 'GET' });
+        if (!res.ok) throw new Error('服务异常');
+    } catch (e) {
+        console.error('后端连接失败:', e);
+        const sub = document.querySelector('.subtitle');
+        if (sub) sub.innerHTML = '⚠️ 无法连接后端，请运行 <code>python main.py</code> 后访问 <a href="http://127.0.0.1:8000" target="_blank">http://127.0.0.1:8000</a>';
+    }
+}
+
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', () => {
+    checkConnection();
     loadKBStats();
     handleFsActionChange();
     updateAnalysisForm();

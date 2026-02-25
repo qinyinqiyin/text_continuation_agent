@@ -36,10 +36,14 @@ logs/
 Thumbs.db
 
 # 模型文件（太大，超过GitHub 100MB限制）
-bert-base-chinese/pytorch_model.bin
+bert-base-chinese/
+*.bin
 # 其他大文件可以手动下载
 
 # 备份文件
 backup_*.pkl
 *.backup
+
+# 评估输出
+recall_evaluation_report.json
 
