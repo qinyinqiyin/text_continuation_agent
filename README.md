@@ -87,7 +87,6 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 ├── langchain_llm.py        # Tongyi + ChatTongyi
 ├── knowledge_base.py       # ChromaKnowledgeBase（写入、检索；排除「已有文章」类型参与 RAG）
 ├── rerank.py               # DashScope rerank（若可用）
-├── function_call.py        # 可选工具示例（占位）
 ├── markdown/               # 默认 Markdown 根：`existing articles.md`、`reference template.md`
 ├── chroma_kb_store/        # Chroma 默认持久化目录（可改环境变量）
 └── static/                 # 前端：index.html、app.js、style.css
