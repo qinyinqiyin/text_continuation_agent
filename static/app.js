@@ -1,7 +1,6 @@
 // 全局状态
 let continuationHistory = '';
 let currentResult = '';
-let currentStyle = 'fantasy';
 
 // API基础URL - 通过 FastAPI 访问时用相对路径；file:// 时回退到 8000 端口
 const API_BASE = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
@@ -52,28 +51,6 @@ function switchTab(tabName) {
     }
 }
 
-// 子标签切换
-document.querySelectorAll('.sub-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const subtabName = btn.dataset.subtab;
-        switchSubTab(subtabName);
-    });
-});
-
-function switchSubTab(subtabName) {
-    document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector(`[data-subtab="${subtabName}"]`).classList.add('active');
-    
-    document.querySelectorAll('.sub-tab-content').forEach(c => c.classList.remove('active'));
-    document.getElementById(subtabName).classList.add('active');
-    
-    if (subtabName === 'text-analysis') {
-        updateAnalysisForm();
-    }
-}
-
-// ==================== 文本续写 ====================
-
 // 更新滑块显示值
 document.getElementById('max-length').addEventListener('input', (e) => {
     document.getElementById('max-length-value').textContent = e.target.value;
@@ -84,23 +61,21 @@ document.getElementById('temperature').addEventListener('input', (e) => {
 });
 
 async function startContinuation() {
-    const style = document.getElementById('style').value;
     const context = document.getElementById('context').value;
     const requirements = document.getElementById('requirements').value;
     const maxLength = parseInt(document.getElementById('max-length').value);
     const temperature = parseFloat(document.getElementById('temperature').value);
 
     if (!context.trim()) {
-        alert('请输入前文内容');
+        alert('请输入前文（故事接写起点）');
         return;
     }
-    
-    currentStyle = style;
-    
+
     // 显示加载
     document.getElementById('loading').style.display = 'block';
     document.getElementById('continuation-result').style.display = 'none';
-    
+    document.getElementById('storywriter-trace').style.display = 'none';
+
     try {
         const response = await fetch(`${API_BASE}/continuation`, {
             method: 'POST',
@@ -108,7 +83,6 @@ async function startContinuation() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                style: style,
                 context: context,
                 requirements: requirements,
                 max_length: maxLength,
@@ -127,6 +101,12 @@ async function startContinuation() {
         if (data.success) {
             currentResult = data.result;
             document.getElementById('result-content').textContent = data.result;
+            const trace = document.getElementById('storywriter-trace');
+            const o = typeof data.outline === 'string' ? data.outline.trim() : '';
+            const p = typeof data.planning === 'string' ? data.planning.trim() : '';
+            document.getElementById('trace-outline').textContent = o || '（本轮无 Outline 输出或生成失败）';
+            document.getElementById('trace-planning').textContent = p || '（本轮无 Planning 输出或生成失败）';
+            trace.style.display = 'block';
             document.getElementById('continuation-result').style.display = 'block';
         } else {
             alert('续写失败：' + (data.error || '未知错误'));
@@ -134,7 +114,7 @@ async function startContinuation() {
     } catch (error) {
         console.error('续写请求错误:', error);
         const msg = error.message === 'Failed to fetch' || error.message.includes('fetch')
-            ? '请求失败：网络连接被重置。\n\n首次续写需加载模型约 1–2 分钟，请等待服务启动完成后再试，或稍后重试。'
+            ? '请求失败：网络连接被重置。\n\nStoryWriter 每轮会多次调用模型，请确认服务已就绪后重试。'
             : '请求失败：' + error.message;
         alert(msg);
     } finally {
@@ -142,22 +122,63 @@ async function startContinuation() {
     }
 }
 
-function mergeResult() {
+async function loadExistingArticlesIntoContext() {
+    try {
+        const response = await fetch(`${API_BASE}/markdown/existing-articles`);
+        if (!response.ok) {
+            console.warn('合并稿加载 HTTP', response.status);
+            return;
+        }
+        const data = await handleResponse(response);
+        if (data.success && typeof data.content === 'string') {
+            document.getElementById('context').value = data.content;
+            continuationHistory = data.content;
+        }
+    } catch (e) {
+        console.warn('自动载入合并稿失败：', e);
+    }
+}
+
+async function mergeResult() {
     if (!currentResult.trim()) {
         alert('没有可合并的续写结果');
         return;
     }
-    
-    const contextTextarea = document.getElementById('context');
-    continuationHistory = continuationHistory + '\n' + currentResult;
-    contextTextarea.value = continuationHistory;
-    currentResult = '';
-    document.getElementById('continuation-result').style.display = 'none';
-    alert('合并成功！');
+    try {
+        const response = await fetch(`${API_BASE}/markdown/existing-articles/append-chapter`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: currentResult })
+        });
+        const data = await handleResponse(response);
+        if (!response.ok) {
+            const d = data.detail;
+            let errMsg = `服务器错误 (${response.status})`;
+            if (typeof d === 'string') {
+                errMsg = d;
+            } else if (Array.isArray(d) && d.length) {
+                errMsg = d.map((x) => (typeof x.msg === 'string' ? x.msg : JSON.stringify(x))).join('; ');
+            }
+            throw new Error(errMsg);
+        }
+        if (!data.success) {
+            alert('写入失败：' + (data.message || '未知'));
+            return;
+        }
+        currentResult = '';
+        document.getElementById('storywriter-trace').style.display = 'none';
+        document.getElementById('continuation-result').style.display = 'none';
+        await loadExistingArticlesIntoContext();
+        alert(data.message || `已并入第 ${data.chapter} 章`);
+    } catch (error) {
+        console.error('合并写入失败:', error);
+        alert('合并失败：' + error.message);
+    }
 }
 
 function downloadText() {
-    const fullText = continuationHistory + (currentResult ? '\n' + currentResult : '');
+    const ctx = document.getElementById('context').value;
+    const fullText = ctx + (currentResult ? (ctx && !ctx.endsWith('\n') ? '\n' : '') + currentResult : '');
     if (!fullText.trim()) {
         alert('暂无内容可下载');
         return;
@@ -425,287 +446,6 @@ async function uploadArticle() {
     }
 }
 
-// ==================== Function Call 工具 ====================
-
-function handleFsActionChange() {
-    const action = document.getElementById('fs-action').value;
-    const container = document.getElementById('fs-action-content');
-    
-    let html = '';
-    
-    if (action === 'import') {
-        html = `
-            <div class="form-group">
-                <label>目录路径</label>
-                <input type="text" id="import-path" placeholder="例如：E:/articles 或 ./articles">
-            </div>
-            <div class="form-group">
-                <label>文件扩展名</label>
-                <div>
-                    <label><input type="checkbox" value=".txt" checked> .txt</label>
-                    <label><input type="checkbox" value=".md"> .md</label>
-                </div>
-            </div>
-            <button class="btn btn-primary" onclick="importDirectory()">🚀 开始导入</button>
-        `;
-    } else if (action === 'backup') {
-        html = `
-            <div class="form-group">
-                <label>备份路径（留空使用默认名称）</label>
-                <input type="text" id="backup-path" placeholder="例如：backup_kb_20241031.pkl">
-            </div>
-            <button class="btn btn-primary" onclick="backupKB()">💾 开始备份</button>
-        `;
-    } else if (action === 'restore') {
-        html = `
-            <div class="form-group">
-                <label>备份文件路径</label>
-                <input type="text" id="restore-path" placeholder="例如：backup_kb_20241031.pkl">
-            </div>
-            <button class="btn btn-danger" onclick="restoreKB()">🔄 恢复知识库</button>
-        `;
-    } else if (action === 'list') {
-        html = `
-            <div class="form-group">
-                <label>目录路径</label>
-                <input type="text" id="list-path" value=".">
-            </div>
-            <button class="btn btn-primary" onclick="listFiles()">📋 列出文件</button>
-            <div id="file-list-result"></div>
-        `;
-    }
-    
-    container.innerHTML = html;
-}
-
-async function importDirectory() {
-    const path = document.getElementById('import-path').value;
-    const checkboxes = document.querySelectorAll('#fs-action-content input[type="checkbox"]:checked');
-    const extensions = Array.from(checkboxes).map(cb => cb.value);
-    
-    if (!path) {
-        alert('请输入目录路径');
-        return;
-    }
-    
-    try {
-        const response = await fetch(`${API_BASE}/tools/filesystem`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'import_directory',
-                source_path: path,
-                file_extensions: extensions
-            })
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text().catch(() => '未知错误');
-            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
-        }
-        
-        const data = await handleResponse(response);
-        
-        if (data.success) {
-            alert(`成功导入 ${data.result.imported_count} 个文件`);
-        } else {
-            alert('导入失败：' + (data.error || '未知错误'));
-        }
-    } catch (error) {
-        console.error('导入目录错误:', error);
-        alert('请求失败：' + error.message);
-    }
-}
-
-async function backupKB() {
-    const path = document.getElementById('backup-path').value;
-    
-    try {
-        const response = await fetch(`${API_BASE}/tools/filesystem`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'backup',
-                target_path: path || null
-            })
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text().catch(() => '未知错误');
-            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
-        }
-        
-        const data = await handleResponse(response);
-        
-        if (data.success) {
-            alert('备份成功！');
-            console.log(data.result);
-        } else {
-            alert('备份失败：' + (data.error || '未知错误'));
-        }
-    } catch (error) {
-        console.error('备份错误:', error);
-        alert('请求失败：' + error.message);
-    }
-}
-
-async function restoreKB() {
-    const path = document.getElementById('restore-path').value;
-    
-    if (!confirm('确定要恢复知识库吗？当前知识库将被覆盖！')) {
-        return;
-    }
-    
-    if (!path) {
-        alert('请输入备份文件路径');
-        return;
-    }
-    
-    try {
-        const response = await fetch(`${API_BASE}/tools/filesystem`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'restore',
-                source_path: path
-            })
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text().catch(() => '未知错误');
-            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
-        }
-        
-        const data = await handleResponse(response);
-        
-        if (data.success) {
-            alert('恢复成功！请刷新页面');
-            location.reload();
-        } else {
-            alert('恢复失败：' + (data.error || '未知错误'));
-        }
-    } catch (error) {
-        console.error('恢复错误:', error);
-        alert('请求失败：' + error.message);
-    }
-}
-
-async function listFiles() {
-    const path = document.getElementById('list-path').value;
-    
-    try {
-        const response = await fetch(`${API_BASE}/tools/filesystem`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'list_files',
-                source_path: path
-            })
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text().catch(() => '未知错误');
-            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
-        }
-        
-        const data = await handleResponse(response);
-        
-        if (data.success) {
-            const result = data.result;
-            const container = document.getElementById('file-list-result');
-            let html = `<p>找到 ${result.file_count} 个文件：</p><ul>`;
-            result.files.forEach(file => {
-                html += `<li>${file.name} (${file.size} 字节)</li>`;
-            });
-            html += '</ul>';
-            container.innerHTML = html;
-        } else {
-            alert('列出文件失败：' + (data.error || '未知错误'));
-        }
-    } catch (error) {
-        console.error('列出文件错误:', error);
-        alert('请求失败：' + error.message);
-    }
-}
-
-// ==================== 文本分析 ====================
-
-function updateAnalysisForm() {
-    const action = document.getElementById('analysis-action').value;
-    const refContainer = document.getElementById('analysis-ref-container');
-    const styleContainer = document.getElementById('analysis-style-container');
-    
-    refContainer.style.display = (action === 'coherence_check' || action === 'duplicate_detection') ? 'block' : 'none';
-    styleContainer.style.display = (action === 'style_detection') ? 'block' : 'none';
-}
-
-document.getElementById('analysis-action').addEventListener('change', updateAnalysisForm);
-
-async function analyzeText() {
-    const action = document.getElementById('analysis-action').value;
-    const text = document.getElementById('analysis-text').value;
-    const refText = document.getElementById('analysis-ref').value;
-    const style = document.getElementById('analysis-style').value;
-    
-    if (!text.trim()) {
-        alert('请输入待分析文本');
-        return;
-    }
-    
-    const params = {
-        action: action,
-        text: text
-    };
-    
-    if (refText && (action === 'coherence_check' || action === 'duplicate_detection')) {
-        params.reference_text = refText;
-    }
-    
-    if (style && action === 'style_detection') {
-        params.style = style;
-    }
-    
-    try {
-        const response = await fetch(`${API_BASE}/tools/text_analysis`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(params)
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text().catch(() => '未知错误');
-            throw new Error(`服务器错误 (${response.status}): ${errorText.substring(0, 200)}`);
-        }
-        
-        const data = await handleResponse(response);
-        
-        if (data.success) {
-            displayAnalysisResult(data.result);
-        } else {
-            alert('分析失败：' + (data.error || '未知错误'));
-        }
-    } catch (error) {
-        console.error('文本分析错误:', error);
-        alert('请求失败：' + error.message);
-    }
-}
-
-function displayAnalysisResult(result) {
-    const container = document.getElementById('analysis-result-content');
-    container.innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
-    document.getElementById('analysis-result').style.display = 'block';
-}
-
 // ==================== 工具函数 ====================
 
 function escapeHtml(text) {
@@ -732,7 +472,6 @@ async function checkConnection() {
 document.addEventListener('DOMContentLoaded', () => {
     checkConnection();
     loadKBStats();
-    handleFsActionChange();
-    updateAnalysisForm();
+    loadExistingArticlesIntoContext();
 });
 

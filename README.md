@@ -1,190 +1,154 @@
-# 文本续写助手
+# StoryWriter 长篇助手
 
-基于RAG（检索增强生成）的智能文本续写工具，支持多种风格续写和知识库管理。
+借鉴论文架构的多阶段长篇小说接写服务：**Outline → Planning → Writing**，结合向量知识库检索、LangChain 工具调用（本地 Markdown / 联网搜索）与 Web 前台。
 
-## 功能特性
+## 功能概览
 
-- 📝 **多风格续写**：支持奇幻、古风、科幻、玄幻、悬疑5种风格
-- 🧠 **RAG增强**：基于FAISS向量数据库的知识库检索
-- 🔧 **Function Call 工具**：文件系统和文本分析工具
-- 🌐 **Web界面**：现代化的 FastAPI + 前端架构
-- ☁️ **Vercel部署**：一键部署到Vercel平台
+- **三阶段 Agent**：先做事件化纲要，再做下一书写单元规划，最后用工具辅助生成接续正文。
+- **共享工具**：Outline / Planning / Writing 共用同一套工具（章节 Markdown、参考模板 Markdown、DuckDuckGo 检索）。
+- **分阶段向量检索**：每个阶段根据自身上下文单独检索 Chroma，摘录写入该阶段系统提示。
+- **已有正文**：不写入向量库；合并稿放在 `markdown/existing articles.md`，按正文中的 **`第N章`**（行首）切分，`query_article_chapter_markdown` 传入 **`1`**、**`第2章`** 等即可取对应章节。
+- **设定类知识库**：角色、世界观、大纲等仍可写入 **Chroma** 供 RAG 使用；不提供「已有文章」类型条目。
+- **Web 前台**：FastAPI 托管静态页——**故事续写**、**设定管理**。
 
 ## 技术栈
 
-- **后端**：FastAPI + LangChain（接收请求、返回 JSON）
-- **前端**：HTML + CSS + JavaScript
-- **AI 流程**：LangChain LCEL / RAG / Agent → 阿里云 DashScope（通义千问）
-- **向量数据库**：FAISS
-- **嵌入模型**：通义 embedding（text-embedding-v2，1536维）
+| 组件 | 说明 |
+|------|------|
+| 后端 | FastAPI、`deps` 生命周期、单例知识库与 Agent |
+| LLM | LangChain Tongyi（纲要/规划）；ChatTongyi + `AgentExecutor`（三阶段带工具） |
+| 向量库 | **Chroma** 持久化 + 通义 **text-embedding-v2** |
+| 检索增强 | `rerank` 对向量命中结果二次排序 |
+| 前端 | `static/`：HTML/CSS/原生 JS |
+
+## 环境要求
+
+- Python **3.9+**（建议 **conda**，例如环境名 `myenv`）
+- 阿里云 **DashScope API Key**（续写与嵌入共用）
 
 ## 快速开始
 
-### 1. 环境要求
-
-- Python 3.9+
-- Conda（推荐）或虚拟环境
-
-### 2. 安装依赖
+### 1. 安装依赖
 
 ```bash
-conda activate myenv  # 或创建新环境
+conda activate myenv   # 或你的虚拟环境
+cd /path/to/text_continuation_agent_clone_tmp
 pip install -r requirements.txt
 ```
 
-### 3. 配置 API 密钥
+若未激活环境直接使用系统 `python`，可能缺少 `chromadb` 等依赖；推荐始终在同一环境中安装与启动。
 
-在项目根目录创建 `.env` 或设置环境变量：
+### 2. 配置环境变量
+
+在项目根目录新建 **`.env`**（UTF-8），至少包含：
 
 ```bash
-cp .env.example .env
-# 编辑 .env，填入 DASHSCOPE_API_KEY=sk-xxx
+DASHSCOPE_API_KEY=sk-xxxx
+PORT=8000
+# 可选：Chroma 落盘路径（默认 ./chroma_kb_store）
+# CHROMA_PERSIST_DIR=./chroma_kb_store
 ```
 
-密钥从 [阿里云 DashScope 控制台](https://dashscope.console.aliyun.com/) 获取。
+与 Markdown 相关的可选变量（不配则使用默认值）：
 
-### 4. 运行项目
+| 变量 | 默认含义 |
+|------|----------|
+| `EXISTING_ARTICLES_MD_PATH` | `{项目根}/markdown/existing articles.md` 合并正文 |
+| `STORY_ARTICLE_MD_DIR` | `{项目根}/markdown/`（兼容按文件名读单篇 `.md`） |
+| `STORY_TEMPLATE_MD_DIR` | `{项目根}/markdown/`（参考模板，如 `reference template.md`） |
 
-**推荐：FastAPI**
+### 3. 准备正文与模板（可选）
+
+- 将整部既有正文写入 **`markdown/existing articles.md`**，章起始行使用 **`第1章`、`第2章`** 等格式。
+- 参考文风可放入 **`markdown/reference template.md`**，工具中用模板文件名主干调用。
+
+### 4. 启动服务
+
 ```bash
 python main.py
-```
-
-访问：http://localhost:8000
-
-**或使用 uvicorn：**
-```bash
+# 或
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-## 部署选项
+浏览器访问：**http://127.0.0.1:8000**（端口以 `PORT` 为准）。
 
-### 选项1: Vercel（推荐用于静态/轻量应用）
+自检：`GET /api/config/check` 可查看 API Key 是否读到、Markdown 路径解析结果等。
 
-**优点**：快速部署，全球CDN，自动HTTPS  
-**缺点**：构建时内存限制严格，不适合大型依赖
-
-详细部署说明请查看项目文档
-
-### 选项2: Railway（推荐用于需要向量检索的应用）⭐
-
-**优点**：
-- ✅ 构建时内存充足，不会OOM
-- ✅ 支持安装PyTorch等大型依赖
-- ✅ 自动部署，配置简单
-- ✅ 每月$5免费额度
-
-**快速部署**：
-1. 访问 https://railway.app
-2. 使用GitHub账号登录
-3. 创建新项目，选择你的仓库
-4. Railway自动检测Python项目并部署
-5. 配置环境变量：`DASHSCOPE_API_KEY`（续写 + 嵌入共用）
-
-### 选项3: Render
-
-**优点**：免费PostgreSQL数据库，文档完善  
-**缺点**：免费服务有冷启动（15分钟不活跃会休眠）
-
-### 其他平台
-
-支持部署到 Render、Vercel 等平台
-
-**推荐**：
-- 🥇 **Railway** - 最适合需要向量检索功能的项目
-- 🥈 **Render** - 适合需要数据库的项目
-- 🥉 **Google Cloud Run** - 适合生产环境
-
-## 项目结构
+## 项目结构（核心文件）
 
 ```
-text_continuation_agent/
-├── main.py              # FastAPI 入口、RAGAgent、全部 API 路由
-├── config.py            # DASHSCOPE_API_KEY、logger
-├── base_classes.py      # BaseModel、BaseStrategy
-├── embedding.py         # 通义 text-embedding-v2
-├── langchain_llm.py     # LangChain Tongyi
-├── strategies.py        # 5 种续写策略
-├── knowledge_base.py    # FAISS 知识库
-├── tools.py             # StoryTools（冲突检测、状态管理）
-├── function_call.py     # Function Call 工具
-├── eval_embedding.py    # 嵌入模型评估（可选）
-├── api/index.py         # Vercel 入口
-├── static/              # 前端
-├── 函数手册与路径图.md
-└── 技术文档.md
+.
+├── main.py                 # FastAPI 入口、REST 路由
+├── deps.py                 # lifespan、全局 KB / Agent 单例
+├── config.py               # 环境变量、Markdown 路径、日志
+├── rag_agent.py            # StoryWriter 管线：检索 + 三阶段 Agent
+├── storywriter_agents.py   # 系统提示、共享上下文文案、共享工具说明
+├── story_markdown_tools.py # 章节 / 模板 / DuckDuckGo 工具
+├── langchain_llm.py        # Tongyi + ChatTongyi
+├── knowledge_base.py       # ChromaKnowledgeBase（写入、检索；排除「已有文章」类型参与 RAG）
+├── rerank.py               # DashScope rerank（若可用）
+├── function_call.py        # 可选工具示例（占位）
+├── markdown/               # 默认 Markdown 根：`existing articles.md`、`reference template.md`
+├── chroma_kb_store/        # Chroma 默认持久化目录（可改环境变量）
+└── static/                 # 前端：index.html、app.js、style.css
 ```
 
 ## 使用说明
 
-### 文本续写
+### 故事续写
 
-1. 输入阿里云DashScope API密钥
-2. 选择续写风格
-3. 输入前文内容
-4. 设置续写参数（长度、创造性等）
-5. 点击"开始续写"
+1. 在「前文」粘贴接写起点，可填「本轮意图 / 约束」。
+2. 调节生成长度与 temperature，点击「开始续写」。
+3. 可展开查看 **Outline**、**Planning** 与最终正文；支持合并到前文、下载文本。
 
-### 知识库管理
+### 设定管理
 
-- **添加设定**：手动添加角色设定、世界观设定等
-- **上传文章**：批量上传TXT文件，自动分段
-- **RAG检索**：续写时自动检索相关知识库内容
+- 手动添加或上传 **TXT** 到向量知识库（类型：文章大纲、角色设定、世界观设定等）。
+- **不再**提供将「已有文章」整篇写入向量库；正文请用合并稿 + 工具按章读取。
 
-### Function Call 工具
+### Agent 工具（模型侧）
 
-- **文件系统工具**：批量导入、备份/恢复知识库
-- **文本分析工具**：质量评分、风格检测、连贯性检查
+- **`query_article_chapter_markdown`**：优先按章节号从 **`existing articles.md`** 切段；否则在 `STORY_ARTICLE_MD_DIR` 下按文件名查整文件。
+- **`query_reference_template_markdown`**：在模板目录按主干名读取，如 **`reference template`**。
+- **`web_search_story_assistance`**：依赖 **`duckduckgo-search`**（已列入 `requirements.txt`）。
 
-## API接口
+## API 摘要
 
-### 文本续写
-```
-POST /api/continuation
-```
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/health` | 健康检查 |
+| GET | `/api/config/check` | 配置与 Markdown 路径预览 |
+| POST | `/api/continuation` | 接写：`context`、`requirements`、`max_length`、`temperature` |
+| GET | `/api/knowledge-base/settings` | 列出设定 |
+| POST | `/api/knowledge-base/settings` | 添加设定（JSON：`type`、`content`） |
+| DELETE | `/api/knowledge-base/settings/{id}` | 按序号删除 |
+| POST | `/api/knowledge-base/upload` | 表单上传 TXT |
+| POST | `/api/knowledge-base/clear` | 清空向量库 |
 
-### 知识库管理
-```
-GET    /api/knowledge-base/settings      # 获取所有设定
-POST   /api/knowledge-base/settings      # 添加设定
-DELETE /api/knowledge-base/settings/:id  # 删除设定
-POST   /api/knowledge-base/upload       # 上传文章
-```
+## 部署提示
 
-### Function Call 工具
-```
-GET  /api/tools                   # 列出工具
-POST /api/tools/:name             # 执行工具
-POST /api/tools/analyze           # 文本分析
-```
+云端部署时需持久化 **`CHROMA_PERSIST_DIR`** 对应目录，否则会话间知识库会丢失。**Vercel 等 Serverless** 不适合长驻 Chroma；更稳妥方式为 **Railway / Render / 自有 VPS / Docker + 挂载卷**。具体绑定域名与 HTTPS 按平台文档操作即可。
 
 ## 注意事项
 
-1. **API 密钥**：在 `config` 或 `.env` 中配置 `DASHSCOPE_API_KEY`，用于续写和嵌入
-3. **知识库数据**：Serverless 环境下知识库不持久化
+1. **`DASHSCOPE_API_KEY`** 勿提交仓库；`.env` 已在 `.gitignore` 中。
+2. DuckDuckGo 在大陆网络环境下可能不稳定，可按需替换为其它搜索工具适配层。
+3. LangChain Community 中对 **Chroma** 的弃用告警仅为提示；后续可迁至 `langchain-chroma` 包。
 
 ## 许可证
 
 MIT License
 
-## 贡献
+## 更新日志（摘要）
 
-欢迎提交Issue和Pull Request！
+### 近期
 
-## 更新日志
+- StoryWriter：**Outline → Planning → Writing**，三阶段 **ChatTongyi + 共享工具**，每阶段独立向量检索。
+- 向量库：**FAISS → Chroma**；正文合并稿 **`markdown/existing articles.md`** + **按「第N章」切工具读**。
+- 知识库类型移除「已有文章」入向量逻辑；前台移除「文件与备份」占位页。
+- 依赖补充 **duckduckgo-search**。
 
-### v2.1.0
-- ✅ Flask → LangChain LCEL / RAG → DashScope 流程
-- ✅ 嵌入模型改用 HuggingFace API（acge_text_embedding，MTEB 中文榜第一）
-- ✅ 无 HF Token 时自动回退到本地 BERT
+### 更早版本
 
-### v2.0.0
-- ✅ 迁移到Flask + 前端架构
-- ✅ 添加Vercel部署支持
-- ✅ 集成 Function Call 工具框架
-- ✅ 优化用户界面
+- 历史曾有过 Flask / Streamlit、FAISS、Function Call 文件系统占位等与当前主干不一致的实现，均已由当前仓库结构替代。
 
-### v1.0.0
-- ✅ 基础文本续写功能
-- ✅ Streamlit界面
-- ✅ RAG知识库检索

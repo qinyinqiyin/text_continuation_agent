@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文本续写助手</title>
+    <title>StoryWriter 长篇助手</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍️</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,14 +12,13 @@
 <body>
     <div class="container">
         <header>
-            <h1>文本续写助手</h1>
-            <p class="subtitle">RAG 增强 · 多风格续写 · 知识库管理</p>
+            <h1>StoryWriter 长篇助手</h1>
+            <p class="subtitle">借鉴论文多智能体架构：Outline → Planning → Writing · RAG 知识库 · 设定管理</p>
         </header>
 
         <nav class="tabs">
-            <button class="tab-btn active" data-tab="continuation">文本续写</button>
+            <button class="tab-btn active" data-tab="continuation">故事续写</button>
             <button class="tab-btn" data-tab="settings">设定管理</button>
-            <button class="tab-btn" data-tab="mcp-tools">工具调用</button>
         </nav>
 
         <main id="continuation" class="tab-content active">
@@ -27,38 +26,38 @@
                 <h2>续写设置</h2>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>风格</label>
-                        <select id="style">
-                            <option value="fantasy">奇幻</option>
-                            <option value="ancient">古风</option>
-                            <option value="sci-fi">科幻</option>
-                            <option value="EasternFantasy">玄幻</option>
-                            <option value="Suspense">悬疑</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>续写长度 <span id="max-length-value">300</span> 字</label>
+                        <label>本段生成长度 <span id="max-length-value">300</span> 字（约）</label>
                         <input type="range" id="max-length" min="100" max="5000" value="300" step="50">
                     </div>
                     <div class="form-group">
-                        <label>创造性 <span id="temperature-value">0.6</span></label>
+                        <label>随机性（temperature） <span id="temperature-value">0.6</span></label>
                         <input type="range" id="temperature" min="0" max="1" value="0.6" step="0.1">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>前文</label>
-                    <textarea id="context" rows="6" placeholder="输入需要续写的文本..."></textarea>
+                    <label>前文（接写起点）</label>
+                    <textarea id="context" rows="6" placeholder="打开页面时将从服务器载入「existing articles.md」全文（路径见 EXISTING_ARTICLES_MD_PATH）；点击「合并到前文」将为本轮正文自动追加「第n章」并写回同一文件"></textarea>
                 </div>
 
                 <div class="form-group">
-                    <label>续写要求</label>
-                    <input type="text" id="requirements" placeholder="可选，如：增加冲突、埋下伏笔">
+                    <label>本轮意图 / 约束（可选）</label>
+                    <input type="text" id="requirements" placeholder="例如：突出人物 A 动摇；收束上一悬念；节奏加快">
                 </div>
 
                 <button class="btn btn-primary" onclick="startContinuation()">开始续写</button>
 
                 <div id="continuation-result" class="result-area" style="display: none;">
+                    <div id="storywriter-trace" class="storywriter-trace" style="display: none;">
+                        <details class="trace-block">
+                            <summary>Outline Agent 输出</summary>
+                            <pre id="trace-outline" class="trace-pre"></pre>
+                        </details>
+                        <details class="trace-block">
+                            <summary>Planning Agent 输出</summary>
+                            <pre id="trace-planning" class="trace-pre"></pre>
+                        </details>
+                    </div>
                     <h3>续写结果</h3>
                     <div id="result-content" class="result-content"></div>
                     <div class="btn-group">
@@ -69,7 +68,7 @@
 
                 <div id="loading" class="loading" style="display: none;">
                     <div class="spinner"></div>
-                    <p>生成中...</p>
+                    <p>StoryWriter：大纲 → 规划 → 写作…</p>
                 </div>
             </div>
         </main>
@@ -86,7 +85,6 @@
                 <div class="form-group">
                     <label>设定类型</label>
                     <select id="upload-setting-type">
-                        <option value="已有文章">已有文章</option>
                         <option value="文章大纲">文章大纲</option>
                         <option value="角色设定">角色设定</option>
                         <option value="世界观设定">世界观设定</option>
@@ -113,7 +111,6 @@
                             <option value="关键物品设定">关键物品设定</option>
                             <option value="情节限制">情节限制</option>
                             <option value="文章大纲">文章大纲</option>
-                            <option value="已有文章">已有文章</option>
                         </select>
                     </div>
                     <div class="form-group" style="grid-column: 1 / -1;">
@@ -128,65 +125,6 @@
                 <h3>已有设定</h3>
                 <div id="settings-list" class="settings-list">
                     <p class="empty-message">暂无设定</p>
-                </div>
-            </div>
-        </main>
-
-        <main id="mcp-tools" class="tab-content">
-            <div class="card">
-                <h2>工具调用</h2>
-                <div class="sub-tabs">
-                    <button class="sub-tab-btn active" data-subtab="filesystem">文件系统</button>
-                    <button class="sub-tab-btn" data-subtab="text-analysis">文本分析</button>
-                </div>
-
-                <div id="filesystem" class="sub-tab-content active">
-                    <div class="form-group">
-                        <label>操作</label>
-                        <select id="fs-action" onchange="handleFsActionChange()">
-                            <option value="import">批量导入</option>
-                            <option value="backup">备份</option>
-                            <option value="restore">恢复</option>
-                            <option value="list">列出文件</option>
-                        </select>
-                    </div>
-                    <div id="fs-action-content"></div>
-                </div>
-
-                <div id="text-analysis" class="sub-tab-content">
-                    <div class="form-group">
-                        <label>分析类型</label>
-                        <select id="analysis-action">
-                            <option value="quality_score">质量评分</option>
-                            <option value="style_detection">风格检测</option>
-                            <option value="coherence_check">连贯性</option>
-                            <option value="duplicate_detection">重复检测</option>
-                            <option value="sentiment_analysis">情感分析</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>待分析文本</label>
-                        <textarea id="analysis-text" rows="6" placeholder="输入文本..."></textarea>
-                    </div>
-                    <div id="analysis-ref-container" class="form-group" style="display: none;">
-                        <label>参考文本</label>
-                        <textarea id="analysis-ref" rows="4" placeholder="用于对比的参考文本"></textarea>
-                    </div>
-                    <div id="analysis-style-container" class="form-group" style="display: none;">
-                        <label>目标风格</label>
-                        <select id="analysis-style">
-                            <option value="fantasy">奇幻</option>
-                            <option value="ancient">古风</option>
-                            <option value="sci-fi">科幻</option>
-                            <option value="EasternFantasy">玄幻</option>
-                            <option value="Suspense">悬疑</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-primary" onclick="analyzeText()">分析</button>
-                    <div id="analysis-result" class="result-area" style="display: none;">
-                        <h3>结果</h3>
-                        <div id="analysis-result-content"></div>
-                    </div>
                 </div>
             </div>
         </main>

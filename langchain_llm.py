@@ -1,24 +1,24 @@
 """
 LangChain Tongyi (通义千问) LLM 适配器
-兼容 BaseModel 接口，底层使用 LangChain
 """
 from config import logger
-from base_classes import BaseModel
 
 
-class LangChainTongyi(BaseModel):
-    """使用 LangChain 的 Tongyi 封装，兼容 BaseModel"""
+class LangChainTongyi:
+    """使用 LangChain 的 Tongyi 封装"""
 
     def __init__(self, api_key: str, model_name: str = "qwen-turbo"):
         self.api_key = api_key
         self.model_name = model_name
         self.llm = None
+        self.chat_llm = None
         self._init_llm()
 
     def _init_llm(self):
         try:
             import dashscope
             from langchain_community.llms import Tongyi
+            from langchain_community.chat_models import ChatTongyi
 
             dashscope.api_key = self.api_key
             self.llm = Tongyi(
@@ -26,6 +26,24 @@ class LangChainTongyi(BaseModel):
                 dashscope_api_key=self.api_key,
                 model_kwargs={"temperature": 0.7, "max_tokens": 1000},
             )
+            # Chat 封装：供 tool-calling Agent 绑定工具（Completes 接口不支持 bind_tools）
+            try:
+                self.chat_llm = ChatTongyi(
+                    dashscope_api_key=self.api_key,
+                    model=self.model_name,
+                    model_kwargs={"temperature": 0.7},
+                )
+                logger.info("ChatTongyi 已就绪（可作为带工具 Agent 的对话模型）")
+            except TypeError:
+                self.chat_llm = ChatTongyi(
+                    dashscope_api_key=self.api_key,
+                    model_name=self.model_name,
+                    model_kwargs={"temperature": 0.7},
+                )
+                logger.info("ChatTongyi 已就绪（model_name 形参初始化）")
+            except Exception as e_chat:
+                self.chat_llm = None
+                logger.warning("ChatTongyi 初始化失败，将回退无工具链路：%s", e_chat)
             logger.info(f"LangChain Tongyi 已初始化: {self.model_name}")
         except ImportError as e:
             logger.error(f"LangChain 依赖缺失: {e}")

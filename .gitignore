@@ -17,7 +17,10 @@ instance/
 .env
 .env.local
 
-# 知识库缓存
+# 知识库缓存（Chroma 持久化目录）
+chroma_kb_store/
+
+# 知识库缓存（旧版 pickle）
 faiss_kb_cache.pkl
 *.pkl
 

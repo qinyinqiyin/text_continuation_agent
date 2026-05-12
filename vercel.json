@@ -1,1 +1,0 @@
-{"version":2,"routes":[{"src":"/api/(.*)","dest":"/api/index.py"},{"src":"/static/(.*)","dest":"/static/$1"},{"src":"/(.*)","dest":"/static/index.html"}],"env":{"PYTHONUTF8":"1"}}

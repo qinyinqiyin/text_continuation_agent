@@ -249,6 +249,46 @@ header .subtitle {
     font-size: 0.95rem;
 }
 
+/* StoryWriter：Outline / Planning 可折叠查看 */
+.storywriter-trace {
+    margin-bottom: 20px;
+}
+
+.trace-block {
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 10px;
+    background: var(--surface);
+}
+
+.trace-block summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--accent);
+    padding: 8px 4px;
+    user-select: none;
+}
+
+.trace-block summary:hover {
+    color: var(--accent-hover);
+}
+
+.trace-pre {
+    margin: 0;
+    padding: 12px 8px;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 280px;
+    overflow-y: auto;
+    background: #f8fafc;
+    border-radius: 0 0 6px 6px;
+    color: var(--text);
+}
+
 /* 加载 */
 .loading {
     text-align: center;
